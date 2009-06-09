@@ -191,9 +191,6 @@ class HelloFS(Fuse):
 						files += [path_to_list(path)[1], 'desktop file']
 				elif path_to_list(path)[2] == 'files':
 					installed_files = (str(item) for item in apt_cache[application].installedFiles)#should cache
-					#bash("dpkg -L "+application) 
-					#print installed_files
-					files = []
 					for item in installed_files:
 						std_item = path_to_list(item)
 						if (['programs', application, 'files']+std_item)[:-1] == path_to_list(path):
@@ -209,6 +206,7 @@ class HelloFS(Fuse):
 								if not os.path.isdir(list_to_path(std_item)):#or more... 
 									files.append(std_item[-1])
 				elif path_to_list(path)[2] == 'data':
+					assert len(path_to_list(path)) <= 4
 					None				
 				else:
 					print "readir else", path
@@ -221,7 +219,7 @@ class HelloFS(Fuse):
 			None
 		elif path_to_list(path)[0] == 'mount':
 			files = bash('ls /media'+list_to_path((path_to_list(path))[1:]))
-			#files += bash('ls ~/.gvfs')#+list_to_path((path_to_list(path))[1:]))
+			#files += bash('ls ~/.gvfs')#+list_to_path((path_to_list(path))[1:]))#FIXME
 		elif path_to_list(path)[0] == 'libs':
 			if len(path_to_list(path)) == 1:
 				for item in app_list:
