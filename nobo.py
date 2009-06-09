@@ -236,7 +236,7 @@ class HelloFS(Fuse):
 					#shouldnt get to an else statement
 					
 		elif path_to_list(path)[0] == 'users':
-			files = bash('ls /home'+list_to_path((path_to_list(path))[1:]))
+			files = os.listdir('/home'+list_to_path((path_to_list(path))[1:]))
 		elif path_to_list(path)[0] == 'system':
 			if len(path_to_list(path)) == 1:
 				files = ['environment', 'executables', 'headers', 'libraries', 'manuals', 'shared', 'tasks']
@@ -259,7 +259,7 @@ class HelloFS(Fuse):
 			elif path_to_list(path)[1] == 'tasks':
 				None				
 		elif path_to_list(path)[0] == 'mount':
-			files = bash('ls /media'+list_to_path((path_to_list(path))[1:]))
+			files = os.listdir('/media'+list_to_path((path_to_list(path))[1:]))
 			#files += bash('ls ~/.gvfs')#+list_to_path((path_to_list(path))[1:]))#FIXME
 		elif path_to_list(path)[0] == 'libs':
 			if len(path_to_list(path)) == 1:
