@@ -78,7 +78,7 @@ def get_target_file_path(path_list):
 	if len(path_list) >= 1 and path_list[0] == 'programs':
 		if len(path_list) >= 3 and path_list[2] == 'files':
 			return path_list[3:]
-		elif len(path_list) >= 3 and path_list[2] == path_list[1]:
+		elif len(path_list) >= 3 and path_list[2] == path_list[1]:#ie the executable file
 			target = bash('which '+path_list[1])#find location of executable with same name as package
 			assert target != []
 			return path_to_list(target[0])
@@ -92,7 +92,16 @@ def get_target_file_path(path_list):
 						if len(std_item) >= 2: #dont want /etc itself
 							if not os.path.isdir(list_to_path(std_item)):
 								if std_item[-1] == path_list[-1]:
-									return std_item#FIXME buggy if multiple with same name					
+									return std_item#FIXME buggy if multiple with same name	
+		elif len(path_list) >= 3 and path_list[2] == 'data':
+			application = path_list[1]									
+			installed_files = (str(item) for item in apt_cache[application].installedFiles)#should cache
+			for item in installed_files:
+				std_item = path_to_list(item)
+				if len(std_item) > 1 and len(std_item[-1]) > 5:#crash checker
+					if std_item[-1][-4:] in ['.png', '.jpg', '.mp3', '.wav', '.ico'] or std_item[-1][-5:] in ['.jpeg']:
+						if std_item[-1] == path_list[-1]:
+							return std_item#FIXME buggy if multiple with same name						
 	elif len(path_list) >= 1 and path_list[0] == 'users':
 		return ['home']+path_list[1:]#so just translates users into home
 	elif len(path_list) >= 1 and path_list[0] == 'mount':
@@ -191,9 +200,6 @@ class HelloFS(Fuse):
 						files += [path_to_list(path)[1], 'desktop file']
 				elif path_to_list(path)[2] == 'files':
 					installed_files = (str(item) for item in apt_cache[application].installedFiles)#should cache
-					#bash("dpkg -L "+application) 
-					#print installed_files
-					files = []
 					for item in installed_files:
 						std_item = path_to_list(item)
 						if (['programs', application, 'files']+std_item)[:-1] == path_to_list(path):
@@ -209,7 +215,14 @@ class HelloFS(Fuse):
 								if not os.path.isdir(list_to_path(std_item)):#or more... 
 									files.append(std_item[-1])
 				elif path_to_list(path)[2] == 'data':
-					None				
+					assert len(path_to_list(path)) <= 4
+					installed_files = (str(item) for item in apt_cache[application].installedFiles)#should cache
+					files = []
+					for item in installed_files:
+						std_item = path_to_list(item)
+						if len(std_item) > 1 and len(std_item[-1]) > 5:#crash checker
+							if std_item[-1][-4:] in ['.png', '.jpg', '.mp3', '.wav', '.ico'] or std_item[-1][-5:] in ['.jpeg']:
+								files.append(std_item[-1])				
 				else:
 					print "readir else", path
 					raise "error"
@@ -238,7 +251,7 @@ class HelloFS(Fuse):
 				None				
 		elif path_to_list(path)[0] == 'mount':
 			files = bash('ls /media'+list_to_path((path_to_list(path))[1:]))
-			#files += bash('ls ~/.gvfs')#+list_to_path((path_to_list(path))[1:]))
+			#files += bash('ls ~/.gvfs')#+list_to_path((path_to_list(path))[1:]))#FIXME
 		elif path_to_list(path)[0] == 'libs':
 			if len(path_to_list(path)) == 1:
 				for item in app_list:
