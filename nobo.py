@@ -48,26 +48,28 @@ class MyStat(fuse.Stat):
         self.st_ctime = 0
 
 def is_linked_path(path_list):
-	#print("is linked",path_list)
-	if len(path_list) >= 1 and path_list[0] == 'programs':
-		if len(path_list) >= 3 and path_list[2] == 'files':
-			if len(path_list) >= 4:
-				return True
-		if len(path_list) >= 3 and path_list[2] == path_list[1]:
-			return True
-		if len(path_list) >= 3 and path_list[2] == 'config':
-			if len(path_list) == 4 and not (path_list[-1] == '.' or path_list[-1] == '..' or path_list[-1] == '.hidden'): #ie not /etc itself #FIXME why is .hidden even possible
-				return True			
-	elif len(path_list) >= 1 and path_list[0] == 'users':
-		if len(path_list) >= 2:
-			return True
-	elif len(path_list) >= 1 and path_list[0] == 'mount':
-		if len(path_list) >= 2:
-			return True
-	elif False:#other linked apps
-		None
-	else:
-		return False
+	if get_target_file_path(path_list) != False: #if get_taget comes up with any target, then it must be linked
+		return True
+#	#print("is linked",path_list)
+#	if len(path_list) >= 1 and path_list[0] == 'programs':
+#		if len(path_list) >= 3 and path_list[2] == 'files':
+#			if len(path_list) >= 4:
+#				return True
+#		if len(path_list) >= 3 and path_list[2] == path_list[1]:
+#			return True
+#		if len(path_list) >= 3 and path_list[2] == 'config':
+#			if len(path_list) == 4 and not (path_list[-1] == '.' or path_list[-1] == '..' or path_list[-1] == '.hidden'): #ie not /etc itself #FIXME why is .hidden even possible
+#				return True			
+#	elif len(path_list) >= 1 and path_list[0] == 'users':
+#		if len(path_list) >= 2:
+#			return True
+#	elif len(path_list) >= 1 and path_list[0] == 'mount':
+#		if len(path_list) >= 2:
+#			return True
+#	elif False:#other linked apps
+#		None
+#	else:
+#		return False
 		
 def get_target_file_path(path_list):
 	assert is_linked_path(path_list)
@@ -104,16 +106,23 @@ def get_target_file_path(path_list):
 	
 		
 def is_fake_file(path_list):
-	#print path_list
+	if get_fake_file_contents(path_list) != False: #if get_fake_contents comes up with any content, then it must be fake
+		return True	
+#	#print path_list
+#	if len(path_list) >= 1 and path_list[0] == 'programs':
+#	#path[1] will be the program
+#		if len(path_list) >= 3 and path_list[2] == 'desktop file': 
+#			return True		
+#	#else
+#	return False
+
+def get_fake_file_contents(path_list):
 	if len(path_list) >= 1 and path_list[0] == 'programs':
 	#path[1] will be the program
 		if len(path_list) >= 3 and path_list[2] == 'desktop file': 
-			return True		
+			return "hello"	
 	#else
 	return False
-
-def get_fake_file_contents(path_list):
-	return "hello"
 
 def list_to_path(path_list):
 	string = ''
