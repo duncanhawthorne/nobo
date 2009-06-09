@@ -47,6 +47,9 @@ class MyStat(fuse.Stat):
         self.st_mtime = 0
         self.st_ctime = 0
 
+translation = {}
+#a dict list linked_file:location_of_thing_linked_to
+
 def is_linked_path(path_list):
 	if get_target_file_path(path_list) != False: #if get_taget comes up with any target, then it must be linked
 		#FIXME, when speed matters, dont actually bother going through the whole f get_target_file_path, ie run with args (path_list, "quick") and get it to stop
@@ -77,12 +80,18 @@ def get_target_file_path(path_list):
 	#programs, app_name, files, start of file path
 	if len(path_list) >= 1 and path_list[0] == 'system':
 		if len(path_list) >= 2 and path_list[1] == 'executables':
-			locations = ['bin', 'sbin', 'usr/bin', 'usr/local/bin', 'usr/sbin', 'usr/local/sbin', 'usr/games']#any more?
-			for loc in locations:
-				if path_list[2] in os.listdir('/'+loc):
-					return path_to_list('/'+loc+'/'+path_list[2])
+			if len(path_list) >= 3:
+				#print translation['system']
+				return translation['system']['executables'][path_list[2]]
 		
-	if len(path_list) >= 1 and path_list[0] == 'programs':
+		#######without tranlations#####	
+		#	locations = [path_to_list(item) for item in os.getenv('PATH').split(":")]
+		#	#ie like [['bin'], ['sbin'], ['usr','bin'], ['usr','local','bin'], ['usr','sbin'], ['usr','local','sbin'], ['usr','games']]#any more?
+		#	for loc in locations:
+		#		if len(path_list) >= 3 and path_list[2] in os.listdir(list_to_path(loc)):
+		#			return loc+[path_list[2]]
+		
+	elif len(path_list) >= 1 and path_list[0] == 'programs':
 		if len(path_list) >= 3 and path_list[2] == 'files':
 			return path_list[3:]
 		elif len(path_list) >= 3 and path_list[2] == path_list[1]:#ie the executable file
@@ -113,6 +122,8 @@ def get_target_file_path(path_list):
 		return ['home']+path_list[1:]#so just translates users into home
 	elif len(path_list) >= 1 and path_list[0] == 'mount':
 		return ['media']+path_list[1:]#so just translates users into home
+	elif len(path_list) >= 1 and path_list[0] == 'libs':
+		None	
 	elif False:#other link paths
 		None
 	else:
@@ -238,20 +249,37 @@ class HelloFS(Fuse):
 		elif path_to_list(path)[0] == 'users':
 			files = os.listdir('/home'+list_to_path((path_to_list(path))[1:]))
 		elif path_to_list(path)[0] == 'system':
+			
+			if not 'system' in translation:
+				translation['system'] = {}
+				translation['system']['executables'] = {}	
+		
 			if len(path_to_list(path)) == 1:
 				files = ['environment', 'executables', 'headers', 'libraries', 'manuals', 'shared', 'tasks']
 			elif path_to_list(path)[1] == 'environment':
 				None
 			elif path_to_list(path)[1] == 'executables':
-				locations = ['bin', 'sbin', 'usr/bin', 'usr/local/bin', 'usr/sbin', 'usr/local/sbin', 'usr/games']#any more?
+			
+				#SPEED
+			#	if not 'executables' in translation['system']:
+			#		translation['system']['executables'] = {}			
+			
+				locations = [['bin'], ['sbin'], ['usr','bin'], ['usr','local','bin'], ['usr','sbin'], ['usr','local','sbin'], ['usr','games']]#[path_to_list(item) for item in os.getenv('PATH').split(":")]
+				#ie like [['bin'], ['sbin'], ['usr','bin'], ['usr','local','bin'], ['usr','sbin'], ['usr','local','sbin'], ['usr','games']]#any more?
 				for loc in locations:
-					files += (os.listdir("/"+loc))
+					list_loc = os.listdir(list_to_path(loc))
+					#print "list_loc = ", list_loc
+					#SPEED
+					for item in list_loc:
+						translation['system']['executables'][item] = loc+[item] #FIXME need to run cleanup, inevitable memory leak
+					
+					files += list_loc
 			elif path_to_list(path)[1] == 'headers':
 				None
 			elif path_to_list(path)[1] == 'libraries':
-				locations = ['lib', 'usr/lib', 'var/lib']#any more?
+				locations = [['lib'], ['usr','lib'], ['var','lib']]#any more?
 				for loc in locations:
-					files += (os.listdir("/"+loc))
+					files += (os.listdir(list_to_path(loc)))
 			elif path_to_list(path)[1] == 'manuals':
 				None								
 			elif path_to_list(path)[1] == 'shared':
@@ -259,7 +287,8 @@ class HelloFS(Fuse):
 			elif path_to_list(path)[1] == 'tasks':
 				None				
 		elif path_to_list(path)[0] == 'mount':
-			files = os.listdir('/media'+list_to_path((path_to_list(path))[1:]))
+			if len(path_to_list(path)) == 2:
+				files = os.listdir('/media'+list_to_path((path_to_list(path))[1:]))
 			#files += bash('ls ~/.gvfs')#+list_to_path((path_to_list(path))[1:]))#FIXME
 		elif path_to_list(path)[0] == 'libs':
 			if len(path_to_list(path)) == 1:
