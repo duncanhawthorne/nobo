@@ -49,6 +49,7 @@ class MyStat(fuse.Stat):
 
 def is_linked_path(path_list):
 	if get_target_file_path(path_list) != False: #if get_taget comes up with any target, then it must be linked
+		#FIXME, when speed matters, dont actually bother going through the whole f get_target_file_path, ie run with args (path_list, "quick") and get it to stop
 		return True
 #	#print("is linked",path_list)
 #	if len(path_list) >= 1 and path_list[0] == 'programs':
@@ -72,7 +73,7 @@ def is_linked_path(path_list):
 #		return False
 		
 def get_target_file_path(path_list):
-	assert is_linked_path(path_list)
+	#assert is_linked_path(path_list)
 	#programs, app_name, files, start of file path
 	if len(path_list) >= 1 and path_list[0] == 'programs':
 		if len(path_list) >= 3 and path_list[2] == 'files':
@@ -82,18 +83,16 @@ def get_target_file_path(path_list):
 			assert target != []
 			return path_to_list(target[0])
 		elif len(path_list) >= 3 and path_list[2] == 'config':
-			assert len(path_list) == 4
-			application = path_list[1]
-			installed_files = (str(item) for item in apt_cache[application].installedFiles)#should cache
-
-			for item in installed_files:
-				std_item = path_to_list(item)
-				if len(std_item) >= 1 and std_item[0] == 'etc':#or more... 
-					if len(std_item) >= 2: #dont want /etc itself
-						if not os.path.isdir(list_to_path(std_item)):
-							if std_item[-1] == path_list[-1]:
-								return std_item#FIXME buggy if multiple with same name
-			print "we shouldnt have got here", path_list						
+			if len(path_list) == 4:#flat inside config
+				application = path_list[1]
+				installed_files = (str(item) for item in apt_cache[application].installedFiles)#should cache
+				for item in installed_files:
+					std_item = path_to_list(item)
+					if len(std_item) >= 1 and std_item[0] == 'etc':#or more... 
+						if len(std_item) >= 2: #dont want /etc itself
+							if not os.path.isdir(list_to_path(std_item)):
+								if std_item[-1] == path_list[-1]:
+									return std_item#FIXME buggy if multiple with same name					
 	elif len(path_list) >= 1 and path_list[0] == 'users':
 		return ['home']+path_list[1:]#so just translates users into home
 	elif len(path_list) >= 1 and path_list[0] == 'mount':
@@ -101,12 +100,14 @@ def get_target_file_path(path_list):
 	elif False:#other link paths
 		None
 	else:
-		print "get_target_File_path .. shouldnt have got here"
+		None
+		#print "get_target_File_path .. shouldnt have got here"
 	return False
 	
 		
 def is_fake_file(path_list):
 	if get_fake_file_contents(path_list) != False: #if get_fake_contents comes up with any content, then it must be fake
+		#FIXME, when speed matters, dont actually bother going through the whole f get_fake_file_contents, ie run with args (path_list, "quick") and get it to stop
 		return True	
 #	#print path_list
 #	if len(path_list) >= 1 and path_list[0] == 'programs':
@@ -172,10 +173,13 @@ class HelloFS(Fuse):
 	def readdir(self, path, offset):
 		files = []
 		if len(path_to_list(path)) == 0:
-			files = ['programs', 'users', 'system', 'mount']
+			files = ['programs', 'users', 'system', 'mount', 'libs']
 		elif path_to_list(path)[0] == 'programs':
 			if len(path_to_list(path)) == 1:
-				files = app_list
+				for item in app_list:
+					if item[:3] != 'lib':
+						files.append(item)
+				#files = app_list
 			else: #1 level down, inside program folder
 				#inside program folders
 				application = path_to_list(path)[1]
@@ -218,13 +222,19 @@ class HelloFS(Fuse):
 		elif path_to_list(path)[0] == 'mount':
 			files = bash('ls /media'+list_to_path((path_to_list(path))[1:]))
 			#files += bash('ls ~/.gvfs')#+list_to_path((path_to_list(path))[1:]))
+		elif path_to_list(path)[0] == 'libs':
+			for item in app_list:
+				if item[:3] == 'lib':
+					files.append(item)		
+			files = ['put something here']
+		
 		elif path_to_list(path)[0] == '.Trash-1000':
 			None	
 		elif path_to_list(path)[0] == '.Trash':
 			None						
 		else:
-			print "readir else", path
-			raise "error"
+			#print "readir else", path
+			files = ['this is a made up folder']
 		
 		#the yield that everything uses
 		for r in  ['.', '..'] + files:
