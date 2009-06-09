@@ -29,7 +29,7 @@ def bash(command):
 	return os.popen(command).read().split("\n")[:-1]
 
 app_list = []
-a = bash("dpkg --get-selections")#FIXME do in python
+a = bash("dpkg --get-selections")#FIXME do in python!
 for item in a:
     if not "deinstall" in item:
         app_list.append(item.split()[0])
