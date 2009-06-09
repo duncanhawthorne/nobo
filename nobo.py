@@ -223,10 +223,18 @@ class HelloFS(Fuse):
 			files = bash('ls /media'+list_to_path((path_to_list(path))[1:]))
 			#files += bash('ls ~/.gvfs')#+list_to_path((path_to_list(path))[1:]))
 		elif path_to_list(path)[0] == 'libs':
-			for item in app_list:
-				if item[:3] == 'lib':
-					files.append(item)		
-			files = ['put something here']
+			if len(path_to_list(path)) == 1:
+				for item in app_list:
+					if item[:3] == 'lib':
+						files.append(item)
+			else: #1 level down, inside program folder
+				#inside program folders
+				application = path_to_list(path)[1]
+				if len(path_to_list(path)) == 2:
+					files = ['same as programs here but for libs']						
+						
+				
+			#files = ['put something here']
 		
 		elif path_to_list(path)[0] == '.Trash-1000':
 			None	
