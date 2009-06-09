@@ -53,7 +53,7 @@ def is_linked_path(path_list):
 		if len(path_list) >= 3 and path_list[2] == 'files':
 			if len(path_list) >= 4:
 				return True
-		if len(path_list) >= 3 and path_list[2] == 'executable':
+		if len(path_list) >= 3 and path_list[2] == path_list[1]:
 			return True
 		if len(path_list) >= 3 and path_list[2] == 'config':
 			if len(path_list) == 4 and not (path_list[-1] == '.' or path_list[-1] == '..'): #ie not /etc itself
@@ -75,7 +75,7 @@ def get_target_file_path(path_list):
 	if len(path_list) >= 1 and path_list[0] == 'programs':
 		if len(path_list) >= 3 and path_list[2] == 'files':
 			return path_list[3:]
-		elif len(path_list) >= 3 and path_list[2] == 'executable':
+		elif len(path_list) >= 3 and path_list[2] == path_list[1]:
 			target = bash('which '+path_list[1])#find location of executable with same name as package
 			assert target != []
 			return path_to_list(target[0])
@@ -172,7 +172,7 @@ class HelloFS(Fuse):
 					files = ['files', 'config', 'data']
 					tmp = bash('which '+(path_to_list(path))[1])
 					if not tmp == []:#ie this package has an associated executable
-						files += ['executable', 'desktop file']
+						files += [path_to_list(path)[1], 'desktop file']
 				elif path_to_list(path)[2] == 'files':
 					installed_files = (str(item) for item in apt_cache[application].installedFiles)#should cache
 					#bash("dpkg -L "+application) 
