@@ -90,6 +90,10 @@ def is_linked_path(path_list):
 #		return False
 		
 def get_target_file_path(path_list):
+	assert not "/" in path_list
+	
+	
+
 	#assert is_linked_path(path_list)
 	#programs, app_name, files, start of file path
 	if len(path_list) >= 1 and path_list[0] == 'system':
@@ -98,7 +102,8 @@ def get_target_file_path(path_list):
 				#print translation['system']
 				if path_list[2] in translation['system']['executables']: #ie quick
 					return translation['system']['executables'][path_list[2]]
-				else:	
+				else:
+					print "we shouldnt have got here"
 					#######without tranlations#####	
 					locations = [['bin'], ['sbin'], ['usr','bin'], ['usr','local','bin'], ['usr','sbin'], ['usr','local','sbin'], ['usr','games']]#[path_to_list(item) for item in os.getenv('PATH').split(":")]
 					#ie like [['bin'], ['sbin'], ['usr','bin'], ['usr','local','bin'], ['usr','sbin'], ['usr','local','sbin'], ['usr','games']]#any more?
@@ -422,22 +427,23 @@ class HelloFS(Fuse):
 			content = get_fake_file_contents(path_list)
 			#need to work out the buffer thing
 			
+			#standard bit given text called content
+			slen = len(content)
+			if offset < slen:
+				if offset + size > slen:
+					size = slen - offset
+				buf = content[offset:offset+size]
+			else:
+				buf = ''
+			return buf			
 		
 		elif False:
 			#files created from nothing 
 			None
 		else:
 			raise "error"
-			
-		#the main return that everything uses	
-		slen = len(content)
-		if offset < slen:
-			if offset + size > slen:
-				size = slen - offset
-			buf = content[offset:offset+size]
-		else:
-			buf = ''
-		return buf	
+				
+	
 
 	#doenst work from here down
 	
@@ -448,9 +454,8 @@ class HelloFS(Fuse):
 		Returns the number of bytes written.
 		"""
 		if is_linked_path(path_list):
-			f = open(get_target_file_path(path), 'r').read()
-			content = f	
-		
+			#FIMXE must be a way to make this work like read, where you just write exactly into the part of the file that you want
+			content = open(list_to_path(get_target_file_path(path_list)), 'r').read()
 		
 			if offset < len(content):
 				# Write over part of the file. Save the bits we want to keep.
@@ -464,17 +469,34 @@ class HelloFS(Fuse):
 				after = ''
 			
 			# Insert buf in between before and after
-			new_content = before + buf + after
+			new_content = before + buf + after		
 		
-			#log(new_content)
 		
-			#f.close()
-		
-			g = open(get_target_file_path(path), 'w')
-			g.write(new_content)
-			g.close()
+			target = open(list_to_path(get_target_file_path(path_list)), 'w')
+			target.seek(offset)
+			target.write(new_content)
+			target.close()
 			return len(buf)
-		elif False:
+
+		elif is_fake_file(path_list):
+			#FIXME non-functional
+		
+			if offset < len(content):
+				# Write over part of the file. Save the bits we want to keep.
+				before = content[:offset]
+				after = content[offset+len(buf):]
+			else:
+				if offset > len(content):
+					# First pad the file with 0s, using truncate
+					content = content + '\0'*(size-len(content))
+				before = content
+				after = ''
+			
+			# Insert buf in between before and after
+			new_content = before + buf + after			
+			
+			return len(buf)
+			
 			None
 			#files created from nothing 
 		else:
