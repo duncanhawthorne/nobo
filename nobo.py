@@ -82,42 +82,55 @@ def get_target_file_path(path_list):
 		if len(path_list) >= 2 and path_list[1] == 'executables':
 			if len(path_list) >= 3:
 				#print translation['system']
-				return translation['system']['executables'][path_list[2]]
-		
-		#######without tranlations#####	
-		#	locations = [path_to_list(item) for item in os.getenv('PATH').split(":")]
-		#	#ie like [['bin'], ['sbin'], ['usr','bin'], ['usr','local','bin'], ['usr','sbin'], ['usr','local','sbin'], ['usr','games']]#any more?
-		#	for loc in locations:
-		#		if len(path_list) >= 3 and path_list[2] in os.listdir(list_to_path(loc)):
-		#			return loc+[path_list[2]]
+				if path_list[2] in translation['system']['executables']: #ie quick
+					return translation['system']['executables'][path_list[2]]
+				else:	
+					#######without tranlations#####	
+					locations = [['bin'], ['sbin'], ['usr','bin'], ['usr','local','bin'], ['usr','sbin'], ['usr','local','sbin'], ['usr','games']]#[path_to_list(item) for item in os.getenv('PATH').split(":")]
+					#ie like [['bin'], ['sbin'], ['usr','bin'], ['usr','local','bin'], ['usr','sbin'], ['usr','local','sbin'], ['usr','games']]#any more?
+					for loc in locations:
+						if len(path_list) >= 3 and path_list[2] in os.listdir(list_to_path(loc)):
+							return loc+[path_list[2]]
 		
 	elif len(path_list) >= 1 and path_list[0] == 'programs':
+		if len(path_list) >= 2:
+			application = path_list[1]
 		if len(path_list) >= 3 and path_list[2] == 'files':
-			return path_list[3:]
+			if len(path_list) >= 4: #ie any strictly sub folders 
+				return path_list[3:]
 		elif len(path_list) >= 3 and path_list[2] == path_list[1]:#ie the executable file
 			target = bash('which '+path_list[1])#find location of executable with same name as package
 			assert target != []
 			return path_to_list(target[0])
 		elif len(path_list) >= 3 and path_list[2] == 'config':
 			if len(path_list) == 4:#flat inside config
-				application = path_list[1]
-				installed_files = (str(item) for item in apt_cache[application].installedFiles)#should cache
-				for item in installed_files:
-					std_item = path_to_list(item)
-					if len(std_item) >= 1 and std_item[0] == 'etc':#or more... 
-						if len(std_item) >= 2: #dont want /etc itself
-							if not os.path.isdir(list_to_path(std_item)):
-								if std_item[-1] == path_list[-1]:
-									return std_item#FIXME buggy if multiple with same name	
+			
+				if path_list[3] in translation['programs'][application]['config']: #quick
+					return translation['programs'][application]['config'][path_list[3]]
+				
+				else: #slow #FIXME infact will soon not even produce the correct results #FIXME but if switch will need to call readdir if the keys arent there
+					installed_files = (str(item) for item in apt_cache[application].installedFiles)#should cache
+					for item in installed_files:
+						std_item = path_to_list(item)
+						if len(std_item) >= 1 and std_item[0] == 'etc':#or more... 
+							if len(std_item) >= 2: #dont want /etc itself
+								if not os.path.isdir(list_to_path(std_item)):
+									if std_item[-1] == path_list[-1]:
+										return std_item #FIXME buggy if multiple with same name	
 		elif len(path_list) >= 3 and path_list[2] == 'data':
-			application = path_list[1]									
-			installed_files = (str(item) for item in apt_cache[application].installedFiles)#should cache
-			for item in installed_files:
-				std_item = path_to_list(item)
-				if len(std_item) > 1 and len(std_item[-1]) > 5:#crash checker
-					if std_item[-1][-4:] in ['.png', '.jpg', '.mp3', '.wav', '.ico'] or std_item[-1][-5:] in ['.jpeg']:
-						if std_item[-1] == path_list[-1]:
-							return std_item#FIXME buggy if multiple with same name						
+		
+			
+			if len(path_list) == 4:#flat inside
+				if path_list[3] in translation['programs'][application]['data']: #quick
+					return translation['programs'][application]['data'][path_list[3]]
+				else:			
+					installed_files = (str(item) for item in apt_cache[application].installedFiles)#should cache
+					for item in installed_files:
+						std_item = path_to_list(item)
+						if len(std_item) > 1 and len(std_item[-1]) > 5:#crash checker
+							if std_item[-1][-4:] in ['.png', '.jpg', '.mp3', '.wav', '.ico'] or std_item[-1][-5:] in ['.jpeg']:
+								if std_item[-1] == path_list[-1]:
+									return std_item #FIXME buggy if multiple with same name						
 	elif len(path_list) >= 1 and path_list[0] == 'users':
 		return ['home']+path_list[1:]#so just translates users into home
 	elif len(path_list) >= 1 and path_list[0] == 'mount':
@@ -202,6 +215,9 @@ class HelloFS(Fuse):
 		if len(path_to_list(path)) == 0:
 			files = ['programs', 'users', 'system', 'mount', 'libs']
 		elif path_to_list(path)[0] == 'programs':
+		
+			if not 'programs' in translation: translation['programs'] = {}
+		
 			if len(path_to_list(path)) == 1:
 				for item in app_list:
 					if item[:3] != 'lib':
@@ -210,6 +226,9 @@ class HelloFS(Fuse):
 			else: #1 level down, inside program folder
 				#inside program folders
 				application = path_to_list(path)[1]
+				
+				if not application in translation['programs']: translation['programs'][application] = {}
+				
 				if len(path_to_list(path)) == 2:
 					#top level folder stuff
 					files = ['files', 'config', 'data']
@@ -223,6 +242,9 @@ class HelloFS(Fuse):
 						if (['programs', application, 'files']+std_item)[:-1] == path_to_list(path):
 							files.append(std_item[-1])
 				elif path_to_list(path)[2] == 'config':
+				
+					if not 'config' in translation['programs'][application]: translation['programs'][application]['config'] = {}
+				
 					assert len(path_to_list(path)) <= 4 #just want flat config structure #FIXME files with the same name in different folders
 					installed_files = (str(item) for item in apt_cache[application].installedFiles)#should cache
 					files = []
@@ -231,8 +253,19 @@ class HelloFS(Fuse):
 						if len(std_item) >= 1 and std_item[0] == 'etc':
 							if len(std_item) >= 2:#dont want /etc itself
 								if not os.path.isdir(list_to_path(std_item)):#or more... 
+								
+									translation['programs'][application]['config'][std_item[-1]] = std_item #FIXME needs to deal with mutliple items having same name
+									#ie if this happen do name-(where_it_is_found)
+								
+									#for standardisation equivalent of: for item in translation['system']['executables']: files.append(translation['system']['executables'][item])
+								
 									files.append(std_item[-1])
+									
+									
 				elif path_to_list(path)[2] == 'data':
+				
+					if not 'data' in translation['programs'][application]: translation['programs'][application]['data'] = {}	
+					
 					assert len(path_to_list(path)) <= 4
 					installed_files = (str(item) for item in apt_cache[application].installedFiles)#should cache
 					files = []
@@ -240,6 +273,9 @@ class HelloFS(Fuse):
 						std_item = path_to_list(item)
 						if len(std_item) > 1 and len(std_item[-1]) > 5:#crash checker
 							if std_item[-1][-4:] in ['.png', '.jpg', '.mp3', '.wav', '.ico'] or std_item[-1][-5:] in ['.jpeg']:
+								
+								translation['programs'][application]['data'][std_item[-1]] = std_item
+							
 								files.append(std_item[-1])				
 				else:
 					print "readir else", path
@@ -250,9 +286,7 @@ class HelloFS(Fuse):
 			files = os.listdir('/home'+list_to_path((path_to_list(path))[1:]))
 		elif path_to_list(path)[0] == 'system':
 			
-			if not 'system' in translation:
-				translation['system'] = {}
-				translation['system']['executables'] = {}	
+			if not 'system' in translation: translation['system'] = {}
 		
 			if len(path_to_list(path)) == 1:
 				files = ['environment', 'executables', 'headers', 'libraries', 'manuals', 'shared', 'tasks']
@@ -261,19 +295,20 @@ class HelloFS(Fuse):
 			elif path_to_list(path)[1] == 'executables':
 			
 				#SPEED
-			#	if not 'executables' in translation['system']:
-			#		translation['system']['executables'] = {}			
+				if not 'executables' in translation['system']: translation['system']['executables'] = {}			
 			
 				locations = [['bin'], ['sbin'], ['usr','bin'], ['usr','local','bin'], ['usr','sbin'], ['usr','local','sbin'], ['usr','games']]#[path_to_list(item) for item in os.getenv('PATH').split(":")]
 				#ie like [['bin'], ['sbin'], ['usr','bin'], ['usr','local','bin'], ['usr','sbin'], ['usr','local','sbin'], ['usr','games']]#any more?
 				for loc in locations:
 					list_loc = os.listdir(list_to_path(loc))
-					#print "list_loc = ", list_loc
+
 					#SPEED
 					for item in list_loc:
 						translation['system']['executables'][item] = loc+[item] #FIXME need to run cleanup, inevitable memory leak
 					
-					files += list_loc
+					files += list_loc #FIXME or should write:
+					#for standardisation: for item in translation['system']['executables']: files.append(translation['system']['executables'][item])
+					
 			elif path_to_list(path)[1] == 'headers':
 				None
 			elif path_to_list(path)[1] == 'libraries':
