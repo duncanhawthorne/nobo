@@ -35,17 +35,31 @@ for item in a:
         app_list.append(item.split()[0])
 
 class MyStat(fuse.Stat):
-    def __init__(self):
-        self.st_mode = 0
-        self.st_ino = 0
-        self.st_dev = 0
-        self.st_nlink = 0
-        self.st_uid = 0
-        self.st_gid = 0
-        self.st_size = 0
-        self.st_atime = 0
-        self.st_mtime = 0
-        self.st_ctime = 0
+	def __init__(self):
+		self.st_mode = 0
+		self.st_ino = 0
+		self.st_dev = 0
+		self.st_nlink = 0
+		self.st_uid = 0
+		self.st_gid = 0
+		self.st_size = 0
+		self.st_atime = 0
+		self.st_mtime = 0
+		self.st_ctime = 0
+
+		"""
+		- st_mode (protection bits)
+		- st_ino (inode number)
+		- st_dev (device)
+		- st_nlink (number of hard links)
+		- st_uid (user ID of owner)
+		- st_gid (group ID of owner)
+		- st_size (size of file, in bytes)
+		- st_atime (time of most recent access)
+		- st_mtime (time of most recent content modification)
+		- st_ctime (platform dependent; time of most recent metadata change on Unix,
+				     or the time of creation on Windows).
+		"""
 
 translation = {}
 #a dict list linked_file:location_of_thing_linked_to
@@ -93,15 +107,21 @@ def get_target_file_path(path_list):
 							return loc+[path_list[2]]
 		
 	elif len(path_list) >= 1 and path_list[0] == 'programs':
-		if len(path_list) >= 2:
-			application = path_list[1]
+		
+		if len(path_list) >= 2: application = path_list[1]
+		
 		if len(path_list) >= 3 and path_list[2] == 'files':
 			if len(path_list) >= 4: #ie any strictly sub folders 
 				return path_list[3:]
-		elif len(path_list) >= 3 and path_list[2] == path_list[1]:#ie the executable file
-			target = bash('which '+path_list[1])#find location of executable with same name as package
+		
+		elif len(path_list) >= 3 and path_list[2] == application:#ie the executable file
+			target = bash('which '+application)#find location of executable with same name as package
 			assert target != []
 			return path_to_list(target[0])
+			
+		elif len(path_list) >= 3 and path_list[2] == application+'.desktop':#ie the executable file
+			return ['usr','share','applications',application+'.desktop']			
+		
 		elif len(path_list) >= 3 and path_list[2] == 'config':
 			if len(path_list) == 4:#flat inside config
 			
@@ -117,6 +137,7 @@ def get_target_file_path(path_list):
 								if not os.path.isdir(list_to_path(std_item)):
 									if std_item[-1] == path_list[-1]:
 										return std_item #FIXME buggy if multiple with same name	
+		
 		elif len(path_list) >= 3 and path_list[2] == 'data':
 		
 			
@@ -158,20 +179,22 @@ def is_fake_file(path_list):
 #	return False
 
 def get_fake_file_contents(path_list):
-	if len(path_list) >= 1 and path_list[0] == 'programs':
-	#path[1] will be the program
-		if len(path_list) >= 3 and path_list[2] == 'desktop file': 
-			return "hello"	
+#	if len(path_list) >= 1 and path_list[0] == 'programs':
+#	#path[1] will be the program
+#		if len(path_list) >= 3 and path_list[2] == 'desktop file': 
+#			return "hello"	
 	#else
 	return False
 
 def list_to_path(path_list):
+	#converts ['usr','bin','gedit'] to '/usr/bin/gedit'
 	string = ''
 	for item in path_list:#FIXME what about if no items, shoud it return '/'
 		string = string+'/'+item
 	return string
 
 def path_to_list(path):
+	#converts '/usr/bin/gedit' to ['usr','bin','gedit']
 	first = path.split("/")
 	if len(first) == 0:
 		return first
@@ -187,17 +210,19 @@ class HelloFS(Fuse):
 
 
 	def getattr(self, path):
+		path_list = path_to_list(path)
+		
 		#log("path "+path)
 		st = MyStat()
-		if is_linked_path(path_to_list(path)):
-			target = get_target_file_path(path_to_list(path))
+		if is_linked_path(path_list):
+			target = get_target_file_path(path_list)
 			st = os.stat(list_to_path(target))
-		elif is_fake_file(path_to_list(path)):
+		elif is_fake_file(path_list):
 			st.st_mode = stat.S_IFREG | 0755
-			st.st_nlink = 1#FIXME does this need to be 1?
+			st.st_nlink = 2
 			st.st_uid = os.getuid()
 			st.st_gid = os.getuid()
-			st.st_size = len(get_fake_file_contents(path_to_list(path)))#len(whatever it is)
+			st.st_size = len(get_fake_file_contents(path_list))#len(whatever it is)
 		elif False:
 			None
 			#pther options, like files i will create from nothing
@@ -211,41 +236,53 @@ class HelloFS(Fuse):
 		return st
 
 	def readdir(self, path, offset):
+		path_list = path_to_list(path)
+		
 		files = []
-		if len(path_to_list(path)) == 0:
+		if len(path_list) == 0:
 			files = ['programs', 'users', 'system', 'mount', 'libs']
-		elif path_to_list(path)[0] == 'programs':
+		elif path_list[0] == 'programs':
 		
 			if not 'programs' in translation: translation['programs'] = {}
 		
-			if len(path_to_list(path)) == 1:
+			if len(path_list) == 1:
 				for item in app_list:
 					if item[:3] != 'lib':
 						files.append(item)
 				#files = app_list
 			else: #1 level down, inside program folder
 				#inside program folders
-				application = path_to_list(path)[1]
+				application = path_list[1]
 				
 				if not application in translation['programs']: translation['programs'][application] = {}
 				
-				if len(path_to_list(path)) == 2:
+				if len(path_list) == 2:
 					#top level folder stuff
 					files = ['files', 'config', 'data']
-					tmp = bash('which '+(path_to_list(path))[1])
+					tmp = bash('which '+(path_list)[1])
 					if not tmp == []:#ie this package has an associated executable
-						files += [path_to_list(path)[1], 'desktop file']
-				elif path_to_list(path)[2] == 'files':
+						files.append(application)
+						
+						found_launcher = False
+						for item in os.listdir(list_to_path(['usr', 'share', 'applications'])):
+							if item == application+'.desktop':
+								found_launcher = True
+								break
+						if found_launcher == True:#as subet of programs will have launchers
+							files.append(application+'.desktop')
+				
+				elif path_list[2] == 'files':
 					installed_files = (str(item) for item in apt_cache[application].installedFiles)#should cache
 					for item in installed_files:
 						std_item = path_to_list(item)
-						if (['programs', application, 'files']+std_item)[:-1] == path_to_list(path):
+						if (['programs', application, 'files']+std_item)[:-1] == path_list:
 							files.append(std_item[-1])
-				elif path_to_list(path)[2] == 'config':
+				
+				elif path_list[2] == 'config':
 				
 					if not 'config' in translation['programs'][application]: translation['programs'][application]['config'] = {}
 				
-					assert len(path_to_list(path)) <= 4 #just want flat config structure #FIXME files with the same name in different folders
+					assert len(path_list) <= 4 #just want flat config structure #FIXME files with the same name in different folders
 					installed_files = (str(item) for item in apt_cache[application].installedFiles)#should cache
 					files = []
 					for item in installed_files:
@@ -262,11 +299,11 @@ class HelloFS(Fuse):
 									files.append(std_item[-1])
 									
 									
-				elif path_to_list(path)[2] == 'data':
+				elif path_list[2] == 'data':
 				
 					if not 'data' in translation['programs'][application]: translation['programs'][application]['data'] = {}	
 					
-					assert len(path_to_list(path)) <= 4
+					assert len(path_list) <= 4
 					installed_files = (str(item) for item in apt_cache[application].installedFiles)#should cache
 					files = []
 					for item in installed_files:
@@ -274,25 +311,34 @@ class HelloFS(Fuse):
 						if len(std_item) > 1 and len(std_item[-1]) > 5:#crash checker
 							if std_item[-1][-4:] in ['.png', '.jpg', '.mp3', '.wav', '.ico'] or std_item[-1][-5:] in ['.jpeg']:
 								
-								translation['programs'][application]['data'][std_item[-1]] = std_item
+								if not std_item[-1] in translation['programs'][application]['data']:#need recursive levels deep check FIXME
+									translation['programs'][application]['data'][std_item[-1]] = std_item
+									
+								else:
+									translation['programs'][application]['data'][std_item[-1]+'-('+std_item[-2]+')'] = std_item
 							
-								files.append(std_item[-1])				
+								
+								
+								#old: files.append(std_item[-1])
+					for item in translation['programs'][application]['data']:
+						files.append(item)				
 				else:
 					print "readir else", path
 					raise "error"
 					#shouldnt get to an else statement
 					
-		elif path_to_list(path)[0] == 'users':
-			files = os.listdir('/home'+list_to_path((path_to_list(path))[1:]))
-		elif path_to_list(path)[0] == 'system':
+		elif path_list[0] == 'users':
+			files = os.listdir(list_to_path(['home']+(path_list)[1:]))
+						
+		elif path_list[0] == 'system':
 			
 			if not 'system' in translation: translation['system'] = {}
 		
-			if len(path_to_list(path)) == 1:
+			if len(path_list) == 1:
 				files = ['environment', 'executables', 'headers', 'libraries', 'manuals', 'shared', 'tasks']
-			elif path_to_list(path)[1] == 'environment':
+			elif path_list[1] == 'environment':
 				None
-			elif path_to_list(path)[1] == 'executables':
+			elif path_list[1] == 'executables':
 			
 				#SPEED
 				if not 'executables' in translation['system']: translation['system']['executables'] = {}			
@@ -309,39 +355,37 @@ class HelloFS(Fuse):
 					files += list_loc #FIXME or should write:
 					#for standardisation: for item in translation['system']['executables']: files.append(translation['system']['executables'][item])
 					
-			elif path_to_list(path)[1] == 'headers':
+			elif path_list[1] == 'headers':
 				None
-			elif path_to_list(path)[1] == 'libraries':
+			elif path_list[1] == 'libraries':
 				locations = [['lib'], ['usr','lib'], ['var','lib']]#any more?
 				for loc in locations:
 					files += (os.listdir(list_to_path(loc)))
-			elif path_to_list(path)[1] == 'manuals':
+			elif path_list[1] == 'manuals':
 				None								
-			elif path_to_list(path)[1] == 'shared':
+			elif path_list[1] == 'shared':
 				None							
-			elif path_to_list(path)[1] == 'tasks':
+			elif path_list[1] == 'tasks':
 				None				
-		elif path_to_list(path)[0] == 'mount':
-			if len(path_to_list(path)) == 2:
-				files = os.listdir('/media'+list_to_path((path_to_list(path))[1:]))
-			#files += bash('ls ~/.gvfs')#+list_to_path((path_to_list(path))[1:]))#FIXME
-		elif path_to_list(path)[0] == 'libs':
-			if len(path_to_list(path)) == 1:
+		elif path_list[0] == 'mount':
+			files = files = os.listdir(list_to_path(['media']+(path_list)[1:]))
+		elif path_list[0] == 'libs':
+			if len(path_list) == 1:
 				for item in app_list:
 					if item[:3] == 'lib':
 						files.append(item)
 			else: #1 level down, inside program folder
 				#inside program folders
-				application = path_to_list(path)[1]
-				if len(path_to_list(path)) == 2:
+				application = path_list[1]
+				if len(path_list) == 2:
 					files = ['same as programs here but for libs']						
 						
 				
 			#files = ['put something here']
 		
-		elif path_to_list(path)[0] == '.Trash-1000':
+		elif path_list[0] == '.Trash-1000':
 			None	
-		elif path_to_list(path)[0] == '.Trash':
+		elif path_list[0] == '.Trash':
 			None						
 		else:
 			#print "readir else", path
@@ -361,13 +405,21 @@ class HelloFS(Fuse):
 	#		return -errno.EACCES
 
 	def read(self, path, size, offset):
+		path_list = path_to_list(path)
+		
 		if False:#not path in app_list:
 			return -errno.ENOENT
-		if is_linked_path(path_to_list(path)):
-			content = open(list_to_path(get_target_file_path(path_to_list(path))), 'rb').read()
+		
+		if is_linked_path(path_list):
+			#content = open(list_to_path(get_target_file_path(path_list)), 'rb').read()
+			
+			target = open(list_to_path(get_target_file_path(path_list)), 'rb')
+			target.seek(offset)
+			return target.read(size)
+			
 
-		elif is_fake_file(path_to_list(path)):
-			content = get_fake_file_contents(path_to_list(path))
+		elif is_fake_file(path_list):
+			content = get_fake_file_contents(path_list)
 			#need to work out the buffer thing
 			
 		
@@ -390,11 +442,12 @@ class HelloFS(Fuse):
 	#doenst work from here down
 	
 	def write(self, path, buf, offset, fh=None):
+		path_list = path_to_list(path)
 		"""
 		Writes to the file.
 		Returns the number of bytes written.
 		"""
-		if is_linked_path(path_to_list(path)):
+		if is_linked_path(path_list):
 			f = open(get_target_file_path(path), 'r').read()
 			content = f	
 		
