@@ -100,16 +100,26 @@ def get_target_file_path(path_list):
 		if len(path_list) >= 2 and path_list[1] == 'executables':
 			if len(path_list) >= 3:
 				#print translation['system']
-				if path_list[2] in translation['system']['executables']: #ie quick
+					
+				#if not (path_list[2] in translation['system']['executables']: #ie need to regenerate
+				#	server.readdir(list_to_path(['system','executables'])
+					
+				try:	
 					return translation['system']['executables'][path_list[2]]
-				else:
-					print "we shouldnt have got here"
-					#######without tranlations#####	
-					locations = [['bin'], ['sbin'], ['usr','bin'], ['usr','local','bin'], ['usr','sbin'], ['usr','local','sbin'], ['usr','games']]#[path_to_list(item) for item in os.getenv('PATH').split(":")]
-					#ie like [['bin'], ['sbin'], ['usr','bin'], ['usr','local','bin'], ['usr','sbin'], ['usr','local','sbin'], ['usr','games']]#any more?
-					for loc in locations:
-						if len(path_list) >= 3 and path_list[2] in os.listdir(list_to_path(loc)):
-							return loc+[path_list[2]]
+				except: #if the key isnt there must have cleaned it up
+					#server.readdir(list_to_path(['system','executables'])) #FIXME but if request a file which doesnt exist, will cause regeneration
+					return translation['system']['executables'][path_list[2]]
+					
+		#		else:
+		#			
+		#			
+		#			print "we shouldnt have got here"
+		#			#######without tranlations#####	
+		#			locations = [['bin'], ['sbin'], ['usr','bin'], ['usr','local','bin'], ['usr','sbin'], ['usr','local','sbin'], ['usr','games']]#[path_to_list(item) for item in os.getenv('PATH').split(":")]
+		#			#ie like [['bin'], ['sbin'], ['usr','bin'], ['usr','local','bin'], ['usr','sbin'], ['usr','local','sbin'], ['usr','games']]#any more?
+		#			for loc in locations:
+		#				if len(path_list) >= 3 and path_list[2] in os.listdir(list_to_path(loc)):
+		#					return loc+[path_list[2]]
 		
 	elif len(path_list) >= 1 and path_list[0] == 'programs':
 		
