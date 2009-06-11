@@ -28,11 +28,49 @@ apt_cache = apt.Cache()
 def bash(command):		
 	return os.popen(command).read().split("\n")[:-1]
 
+def list_to_path(path_list):
+	#converts ['usr','bin','gedit'] to '/usr/bin/gedit'
+	string = ''
+	for item in path_list:#FIXME what about if no items, shoud it return '/'
+		string = string+'/'+item
+	return string
+
+def path_to_list(path):
+	#converts '/usr/bin/gedit' to ['usr','bin','gedit']
+	first = path.split("/")
+	if len(first) == 0:
+		return first
+	if first[0] == '':
+		first = first[1:]
+	if len(first) == 0:
+		return first		
+	if first[-1] == '':
+		first = first[:-1]
+	return first
+
+
 app_list = []
 a = bash("dpkg --get-selections")#FIXME do in python!
 for item in a:
     if not "deinstall" in item:
         app_list.append(item.split()[0])
+
+#app_list = app_list[:100]
+
+gui_apps = [] #front facing applications. apps with launchers
+for file_name in os.listdir('/usr/share/applications'):
+	gui_apps.append(file_name.split('.desktop')[0])
+		
+#custom icons #FIXME this needs nautilus to be killed and reopened to make this work
+icons_path = os.getenv('HOME')+'/.nautilus/metafiles/'+('file://'+os.getenv('HOME')+'/empty/programs').replace('/', '%2F')+'.xml'
+bash('touch '+icons_path)
+icons_file = open(icons_path, 'w')
+icons_text = '<?xml version="1.0"?>\n<directory>'
+for app in gui_apps:
+	icons_text += '<file name="'+app+'" custom_icon="'+'folder.jpg'+'"/>'
+icons_text += '</directory>\n'
+icons_file.write(icons_text)
+icons_file.close()	
 
 class MyStat(fuse.Stat):
 	def __init__(self):
@@ -92,7 +130,16 @@ def is_linked_path(path_list):
 def get_target_file_path(path_list):
 	assert not "/" in path_list
 	
-	
+	try:
+		if path_list[0] == 'programs' and path_list[2] == 'folder.jpg':
+			application = path_list[1]
+			
+			if os.path.exists('/usr/share/pixmaps/'+application+'.png'):
+				return ['usr','share','pixmaps', application+'.png']
+			else:
+				return ['home','d','pictures','me.jpg']
+	except:
+		None
 
 	#assert is_linked_path(path_list)
 	#programs, app_name, files, start of file path
@@ -201,25 +248,7 @@ def get_fake_file_contents(path_list):
 	#else
 	return False
 
-def list_to_path(path_list):
-	#converts ['usr','bin','gedit'] to '/usr/bin/gedit'
-	string = ''
-	for item in path_list:#FIXME what about if no items, shoud it return '/'
-		string = string+'/'+item
-	return string
 
-def path_to_list(path):
-	#converts '/usr/bin/gedit' to ['usr','bin','gedit']
-	first = path.split("/")
-	if len(first) == 0:
-		return first
-	if first[0] == '':
-		first = first[1:]
-	if len(first) == 0:
-		return first		
-	if first[-1] == '':
-		first = first[:-1]
-	return first
 
 class HelloFS(Fuse):
 
@@ -273,17 +302,13 @@ class HelloFS(Fuse):
 				
 				if len(path_list) == 2:
 					#top level folder stuff
-					files = ['files', 'config', 'data']
+					files = ['files', 'config', 'data', 'folder.jpg']#FIXME remove folder.jpg
 					tmp = bash('which '+(path_list)[1])
 					if not tmp == []:#ie this package has an associated executable
 						files.append(application)
 						
-						found_launcher = False
-						for item in os.listdir(list_to_path(['usr', 'share', 'applications'])):
-							if item == application+'.desktop':
-								found_launcher = True
-								break
-						if found_launcher == True:#as subet of programs will have launchers
+						#as subet of programs will have launchers
+						if application in gui_apps: 
 							files.append(application+'.desktop')
 				
 				elif path_list[2] == 'files':
