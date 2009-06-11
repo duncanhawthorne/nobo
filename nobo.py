@@ -25,6 +25,9 @@ fuse.fuse_python_api = (0, 2)
 import apt
 apt_cache = apt.Cache()
 
+import gtk
+GTK = gtk.IconTheme()
+
 def bash(command):		
 	return os.popen(command).read().split("\n")[:-1]
 
@@ -67,10 +70,13 @@ bash('touch '+icons_path)
 icons_file = open(icons_path, 'w')
 icons_text = '<?xml version="1.0"?>\n<directory>'
 for app in gui_apps:
-	icons_text += '<file name="'+app+'" custom_icon="'+'folder.jpg'+'"/>'
+	icons_text += '<file name="'+app+'" custom_icon="'+'folder.jpg'+'"/>\n'
 icons_text += '</directory>\n'
 icons_file.write(icons_text)
 icons_file.close()	
+
+def application_to_icons(application):
+
 
 class MyStat(fuse.Stat):
 	def __init__(self):
@@ -133,11 +139,10 @@ def get_target_file_path(path_list):
 	try:
 		if path_list[0] == 'programs' and path_list[2] == 'folder.jpg':
 			application = path_list[1]
-			
-			if os.path.exists('/usr/share/pixmaps/'+application+'.png'):
-				return ['usr','share','pixmaps', application+'.png']
-			else:
-				return ['home','d','pictures','me.jpg']
+			if application in gui_apps:
+				b = GTK.lookup_icon(application, 24, 0)
+				if b != None:
+					return path_to_list(b.get_filename())
 	except:
 		None
 
