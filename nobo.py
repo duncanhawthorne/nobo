@@ -65,17 +65,19 @@ for file_name in os.listdir('/usr/share/applications'):
 	gui_apps.append(file_name.split('.desktop')[0])
 		
 #custom icons #FIXME this needs nautilus to be killed and reopened to make this work
-icons_path = os.getenv('HOME')+'/.nautilus/metafiles/'+('file://'+os.getenv('HOME')+'/empty/programs').replace('/', '%2F')+'.xml'
-bash('touch '+icons_path)
-icons_file = open(icons_path, 'w')
-icons_text = '<?xml version="1.0"?>\n<directory>'
-for app in gui_apps:
-	icons_text += '<file name="'+app+'" custom_icon="'+'folder.jpg'+'"/>\n'
-icons_text += '</directory>\n'
-icons_file.write(icons_text)
-icons_file.close()	
+if False:
+	icons_path = os.getenv('HOME')+'/.nautilus/metafiles/'+('file://'+os.getenv('HOME')+'/empty/programs').replace('/', '%2F')+'.xml'
+	bash('touch '+icons_path)
+	icons_file = open(icons_path, 'w')
+	icons_text = '<?xml version="1.0"?>\n<directory>'
+	for app in gui_apps:
+		icons_text += '<file name="'+app+'" custom_icon="'+'folder.jpg'+'"/>\n'
+	icons_text += '</directory>\n'
+	icons_file.write(icons_text)
+	icons_file.close()	
 
 def application_to_icons(application):
+	None
 
 
 class MyStat(fuse.Stat):
