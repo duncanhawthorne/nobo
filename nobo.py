@@ -27,6 +27,7 @@ apt_cache = apt.Cache()
 
 import gtk
 GTK = gtk.IconTheme()
+GTK.set_custom_theme('Mac4Lin_Icons')#FIXME set current theme
 
 def bash(command):		
 	return os.popen(command).read().split("\n")[:-1]
@@ -65,7 +66,7 @@ for file_name in os.listdir('/usr/share/applications'):
 	gui_apps.append(file_name.split('.desktop')[0])
 		
 #custom icons #FIXME this needs nautilus to be killed and reopened to make this work
-if False:
+if False: #FIXME return to True obviously
 	icons_path = os.getenv('HOME')+'/.nautilus/metafiles/'+('file://'+os.getenv('HOME')+'/empty/programs').replace('/', '%2F')+'.xml'
 	bash('touch '+icons_path)
 	icons_file = open(icons_path, 'w')
@@ -76,8 +77,7 @@ if False:
 	icons_file.write(icons_text)
 	icons_file.close()	
 
-def application_to_icons(application):
-	None
+
 
 
 class MyStat(fuse.Stat):
@@ -111,7 +111,8 @@ translation = {}
 #a dict list linked_file:location_of_thing_linked_to
 
 def is_linked_path(path_list):
-	if get_target_file_path(path_list) != False: #if get_taget comes up with any target, then it must be linked
+	output = get_target_file_path(path_list)
+	if output != False and output != None: #if get_taget comes up with any target, then it must be linked
 		#FIXME, when speed matters, dont actually bother going through the whole f get_target_file_path, ie run with args (path_list, "quick") and get it to stop
 		return True
 #	#print("is linked",path_list)
@@ -134,19 +135,32 @@ def is_linked_path(path_list):
 #		None
 #	else:
 #		return False
+
+def application_to_icons(application): #FIXME speed me up with a library
+	if application in gui_apps:
+		icon = GTK.lookup_icon(application, 24, 0)
+		if icon == None: #so second attempt
+			output = open('/usr/share/applications/'+application+'.desktop', 'r').read()
+			for line in output.split('\n'):
+				if 'Icon' in line:
+					path = line.split('=')[1]
+					break
+			try:
+				path#check if it has been set
+			except:
+				return None
+			icon = GTK.lookup_icon(path, 24, 0)
+		if icon == None:
+			return None
+		else:
+			return path_to_list(icon.get_filename())
+	#else
+	return None
+		
+	
 		
 def get_target_file_path(path_list):
 	assert not "/" in path_list
-	
-	try:
-		if path_list[0] == 'programs' and path_list[2] == 'folder.jpg':
-			application = path_list[1]
-			if application in gui_apps:
-				b = GTK.lookup_icon(application, 24, 0)
-				if b != None:
-					return path_to_list(b.get_filename())
-	except:
-		None
 
 	#assert is_linked_path(path_list)
 	#programs, app_name, files, start of file path
@@ -186,10 +200,20 @@ def get_target_file_path(path_list):
 		elif len(path_list) >= 3 and path_list[2] == application:#ie the executable file
 			target = bash('which '+application)#find location of executable with same name as package
 			assert target != []
-			return path_to_list(target[0])
+			if path_to_list(target[0]) != None:
+				return path_to_list(target[0])
+			else:
+				return False
 			
 		elif len(path_list) >= 3 and path_list[2] == application+'.desktop':#ie the executable file
 			return ['usr','share','applications',application+'.desktop']			
+
+		elif len(path_list) >= 3 and path_list[2] == 'folder.jpg':#FIXME stop calling a png a jpg
+			icon_path_list = application_to_icons(application)
+			if icon_path_list == None:
+				return False
+			else:
+				return icon_path_list
 		
 		elif len(path_list) >= 3 and path_list[2] == 'config':
 			if len(path_list) == 4:#flat inside config
@@ -248,6 +272,13 @@ def is_fake_file(path_list):
 #	return False
 
 def get_fake_file_contents(path_list):
+	if len(path_list) >= 1 and path_list[0] == 'programs':
+		if len(path_list) >= 2 and path_list[1] == '.hidden':
+			text = ''
+			for application in app_list:#[:20]:#FIXME remove 20 restriction
+				if not application in gui_apps:
+					text += application+'\n'
+			return text
 #	if len(path_list) >= 1 and path_list[0] == 'programs':
 #	#path[1] will be the program
 #		if len(path_list) >= 3 and path_list[2] == 'desktop file': 
@@ -300,6 +331,8 @@ class HelloFS(Fuse):
 				for item in app_list:
 					if item[:3] != 'lib':
 						files.append(item)
+				
+				files.append('.hidden')
 				#files = app_list
 			else: #1 level down, inside program folder
 				#inside program folders
