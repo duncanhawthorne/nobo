@@ -29,6 +29,8 @@ import gtk
 GTK = gtk.IconTheme()
 GTK.set_custom_theme('Mac4Lin_Icons')#FIXME set current theme
 
+package_provider = {}
+
 def bash(command):		
 	return os.popen(command).read().split("\n")[:-1]
 
@@ -66,8 +68,8 @@ for file_name in os.listdir('/usr/share/applications'):
 	gui_apps.append(file_name.split('.desktop')[0])
 		
 #custom icons #FIXME this needs nautilus to be killed and reopened to make this work
-if False: #FIXME return to True obviously
-	icons_path = os.getenv('HOME')+'/.nautilus/metafiles/'+('file://'+os.getenv('HOME')+'/empty/programs').replace('/', '%2F')+'.xml'#FIXME generalise for mount point
+if True: #FIXME return to True obviously
+	icons_path = os.getenv('HOME')+'/.nautilus/metafiles/'+('file://'+os.getenv('HOME')+'/empty3/programs').replace('/', '%2F')+'.xml'#FIXME generalise for mount point
 	#FIXME make work for paths containing spaces or other weird characters. need library function
 	bash('touch '+icons_path)
 	icons_file = open(icons_path, 'w')
@@ -78,6 +80,17 @@ if False: #FIXME return to True obviously
 	icons_file.write(icons_text)
 	icons_file.close()	
 
+if True: #FIXME return to True obviously
+	icons_path = os.getenv('HOME')+'/.nautilus/metafiles/'+('file://'+os.getenv('HOME')+'/empty3/apps').replace('/', '%2F')+'.xml'#FIXME generalise for mount point
+	#FIXME make work for paths containing spaces or other weird characters. need library function
+	bash('touch '+icons_path)
+	icons_file = open(icons_path, 'w')
+	icons_text = '<?xml version="1.0"?>\n<directory>'
+	for app in gui_apps:
+		icons_text += '<file name="'+app+'" custom_icon="'+'folder.jpg'+'"/>\n'
+	icons_text += '</directory>\n'
+	icons_file.write(icons_text)
+	icons_file.close()
 
 
 
@@ -251,7 +264,20 @@ def get_target_file_path(path_list):
 	elif len(path_list) >= 1 and path_list[0] == 'mount':
 		return ['media']+path_list[1:]#so just translates users into home
 	elif len(path_list) >= 1 and path_list[0] == 'libs':
-		None	
+		None
+	elif len(path_list) >= 1 and path_list[0] == 'apps':
+		if len(path_list) >= 2:
+			if len(path_list) == 3 and path_list[2] == 'folder.jpg':
+				application = path_list[1]
+				icon_path_list = application_to_icons(application)
+				if icon_path_list == None:
+					return False
+				else:
+					return icon_path_list				
+			else:
+				if len(path_list) >= 4 and path_list[2] == 'package':
+					providing_package = package_provider[path_list[1]]
+					return ['home', 'd', 'empty3', 'programs', providing_package]+path_list[3:]
 	elif False:#other link paths
 		None
 	else:
@@ -323,7 +349,27 @@ class HelloFS(Fuse):
 		
 		files = []
 		if len(path_list) == 0:
-			files = ['programs', 'users', 'system', 'mount', 'libs']
+			files = ['programs', 'users', 'system', 'mount', 'libs', 'apps']
+		elif path_list[0] == 'apps':
+			if len(path_list) == 1:
+				files = list(app.split('.')[0] for app in os.listdir('/usr/share/applications'))
+			else:
+				if len(path_list) == 2:
+					files = ['package', 'folder.jpg']
+				else:
+					None
+					if len(path_list) >= 3 and path_list[2] == 'package':
+						if path_list[1] != '.hidden':
+							print path_list
+							if path_list[1] in package_provider:
+								providing_package = package_provider[path_list[1]]
+							else:
+								providing_package = bash('dpkg --search /usr/share/applications/'+path_list[1]+'.desktop')[0].split(':')[0]
+								package_provider[path_list[1]] = providing_package
+							
+							files = os.listdir(list_to_path(['home', 'd', 'empty3', 'programs', providing_package]+path_list[3:]))#FIXME generalise empty3
+			
+			
 		elif path_list[0] == 'programs':
 		
 			if not 'programs' in translation: translation['programs'] = {}
