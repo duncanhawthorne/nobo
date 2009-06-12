@@ -319,7 +319,15 @@ def get_fake_file_contents(path_list):
 	#else
 	return False
 
+def is_symlink(path_list):
+	output = symlink_target(path_list)
+	if output != None and output != False:
+		return True
+	#else
+	return False	
 
+def symlink_target(path_list):
+	None
 
 class HelloFS(Fuse):
 
@@ -338,6 +346,9 @@ class HelloFS(Fuse):
 			st.st_uid = os.getuid()
 			st.st_gid = os.getuid()
 			st.st_size = len(get_fake_file_contents(path_list))#len(whatever it is)
+		elif is_symlink(path_list):
+			None
+		
 		elif False:
 			None
 			#pther options, like files i will create from nothing
@@ -366,7 +377,7 @@ class HelloFS(Fuse):
 					None
 					if len(path_list) >= 3 and path_list[2] == 'package':
 						if path_list[1] != '.hidden':
-							print path_list
+							#print path_list
 							if path_list[1] in package_provider:
 								providing_package = package_provider[path_list[1]]
 							else:
