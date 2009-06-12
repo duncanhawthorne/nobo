@@ -16,6 +16,11 @@
 #	along with this program; if not, write to the Free Software
 #	Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+import sys
+
+#print sys.argv
+mount_point = sys.argv[2]
+
 import os, stat, errno
 
 import fuse
@@ -69,7 +74,7 @@ for file_name in os.listdir('/usr/share/applications'):
 		
 #custom icons #FIXME this needs nautilus to be killed and reopened to make this work
 if True: #FIXME return to True obviously
-	icons_path = os.getenv('HOME')+'/.nautilus/metafiles/'+('file://'+os.getenv('HOME')+'/empty3/programs').replace('/', '%2F')+'.xml'#FIXME generalise for mount point
+	icons_path = os.getenv('HOME')+'/.nautilus/metafiles/'+('file://'+mount_point+'/programs').replace('/', '%2F')+'.xml'#FIXME generalise for mount point
 	#FIXME make work for paths containing spaces or other weird characters. need library function
 	bash('touch '+icons_path)
 	icons_file = open(icons_path, 'w')
@@ -81,7 +86,7 @@ if True: #FIXME return to True obviously
 	icons_file.close()	
 
 if True: #FIXME return to True obviously
-	icons_path = os.getenv('HOME')+'/.nautilus/metafiles/'+('file://'+os.getenv('HOME')+'/empty3/apps').replace('/', '%2F')+'.xml'#FIXME generalise for mount point
+	icons_path = os.getenv('HOME')+'/.nautilus/metafiles/'+('file://'+mount_point+'/apps').replace('/', '%2F')+'.xml'#FIXME generalise for mount point
 	#FIXME make work for paths containing spaces or other weird characters. need library function
 	bash('touch '+icons_path)
 	icons_file = open(icons_path, 'w')
@@ -275,9 +280,10 @@ def get_target_file_path(path_list):
 				else:
 					return icon_path_list				
 			else:
-				if len(path_list) >= 4 and path_list[2] == 'package':
-					providing_package = package_provider[path_list[1]]
-					return ['home', 'd', 'empty3', 'programs', providing_package]+path_list[3:]
+				None
+				#if len(path_list) >= 4 and path_list[2] == 'package':
+				#	providing_package = package_provider[path_list[1]]
+				#	return path_to_list(mount_point) + ['programs', providing_package]+path_list[3:]
 	elif False:#other link paths
 		None
 	else:
@@ -364,10 +370,14 @@ class HelloFS(Fuse):
 							if path_list[1] in package_provider:
 								providing_package = package_provider[path_list[1]]
 							else:
-								providing_package = bash('dpkg --search /usr/share/applications/'+path_list[1]+'.desktop')[0].split(':')[0]
+								#providing_package = bash('dpkg --search /usr/share/applications/'+path_list[1]+'.desktop')[0].split(':')[0]
+								providing_package = 'gedit'
 								package_provider[path_list[1]] = providing_package
-							
-							files = os.listdir(list_to_path(['home', 'd', 'empty3', 'programs', providing_package]+path_list[3:]))#FIXME generalise empty3
+						
+						#  FIXME cant have it listing another drectory insid the fuse stuff, as this would run readdir inside readdir, which (i think) causes a major hang
+						#	FIXME change to symbolic link	
+						#	files = os.listdir(list_to_path(path_to_list(mount_point) + ['programs', providing_package]+path_list[3:]))
+						#	print files
 			
 			
 		elif path_list[0] == 'programs':
