@@ -19,7 +19,11 @@
 import sys
 
 #print sys.argv
-mount_point = sys.argv[2]
+if __name__ == '__main__':
+	mount_point = sys.argv[2]
+else:	
+	#FIXME deal with interactive
+	print "have not dealt with mount point when run from interactive python session"
 
 import os, stat, errno
 
@@ -71,31 +75,33 @@ for item in a:
 gui_apps = [] #front facing applications. apps with launchers
 for file_name in os.listdir('/usr/share/applications'):
 	gui_apps.append(file_name.split('.desktop')[0])
-		
-#custom icons #FIXME this needs nautilus to be killed and reopened to make this work
-if True: #FIXME return to True obviously
-	icons_path = os.getenv('HOME')+'/.nautilus/metafiles/'+('file://'+mount_point+'/programs').replace('/', '%2F')+'.xml'#FIXME generalise for mount point
-	#FIXME make work for paths containing spaces or other weird characters. need library function
-	bash('touch '+icons_path)
-	icons_file = open(icons_path, 'w')
-	icons_text = '<?xml version="1.0"?>\n<directory>'
-	for app in gui_apps:
-		icons_text += '<file name="'+app+'" custom_icon="'+'folder.jpg'+'"/>\n'
-	icons_text += '</directory>\n'
-	icons_file.write(icons_text)
-	icons_file.close()	
 
-if True: #FIXME return to True obviously
-	icons_path = os.getenv('HOME')+'/.nautilus/metafiles/'+('file://'+mount_point+'/apps').replace('/', '%2F')+'.xml'#FIXME generalise for mount point
-	#FIXME make work for paths containing spaces or other weird characters. need library function
-	bash('touch '+icons_path)
-	icons_file = open(icons_path, 'w')
-	icons_text = '<?xml version="1.0"?>\n<directory>'
-	for app in gui_apps:
-		icons_text += '<file name="'+app+'" custom_icon="'+'folder.jpg'+'"/>\n'
-	icons_text += '</directory>\n'
-	icons_file.write(icons_text)
-	icons_file.close()
+if __name__ == '__main__':		
+	#custom icons #FIXME this needs nautilus to be killed and reopened to make this work
+	#FIXME turn into a function, which automatically does it for everything in the folder, with folder.jpg (problem, wont be able to read the folder till this bit of code has already run, as we are reading our own fuse folder)
+	if False: #FIXME return to True obviously
+		icons_path = os.getenv('HOME')+'/.nautilus/metafiles/'+('file://'+mount_point+'/programs').replace('/', '%2F')+'.xml'
+		#FIXME make work for paths containing spaces or other weird characters. need library function
+		bash('touch '+icons_path)
+		icons_file = open(icons_path, 'w')
+		icons_text = '<?xml version="1.0"?>\n<directory>'
+		for app in gui_apps:
+			icons_text += '<file name="'+app+'" custom_icon="'+'folder.jpg'+'"/>\n'
+		icons_text += '</directory>\n'
+		icons_file.write(icons_text)
+		icons_file.close()	
+
+	if False: #FIXME return to True obviously
+		icons_path = os.getenv('HOME')+'/.nautilus/metafiles/'+('file://'+mount_point+'/apps').replace('/', '%2F')+'.xml'
+		#FIXME make work for paths containing spaces or other weird characters. need library function
+		bash('touch '+icons_path)
+		icons_file = open(icons_path, 'w')
+		icons_text = '<?xml version="1.0"?>\n<directory>'
+		for app in gui_apps:
+			icons_text += '<file name="'+app+'" custom_icon="'+'folder.jpg'+'"/>\n'
+		icons_text += '</directory>\n'
+		icons_file.write(icons_text)
+		icons_file.close()
 
 
 
@@ -194,7 +200,7 @@ def get_target_file_path(path_list):
 				try:	
 					return translation['system']['executables'][path_list[2]]
 				except: #if the key isnt there must have cleaned it up
-					#server.readdir(list_to_path(['system','executables'])) #FIXME but if request a file which doesnt exist, will cause regeneration
+					#server.readdir(list_to_path(['system','executables'])) #FIXME but if request a file which doesnt exist, will cause regeneration #FIXME really do need some regeneration thing when later do cleanup
 					return translation['system']['executables'][path_list[2]]
 					
 		#		else:
@@ -329,6 +335,18 @@ def is_symlink(path_list):
 def symlink_target(path_list):
 	None
 
+
+def related_packages(package):
+	#FIXME extend to use actual debian dependencies, specifically packages 1 level up or down in dependencies?
+	
+	related = []
+	
+	for app in app_list:
+		if app != package:#FIXME should this be left in
+			if app[:len(package)] == package or (app[:3] == 'lib' and app[3:len(package) + 3] == package):
+				related.append(app)
+	return related
+
 class HelloFS(Fuse):
 
 
@@ -372,6 +390,7 @@ class HelloFS(Fuse):
 				files = list(app.split('.')[0] for app in os.listdir('/usr/share/applications'))
 			else:
 				if len(path_list) == 2:
+					providing_package = bash('dpkg --search /usr/share/applications/'+path_list[1]+'.desktop')[0].split(':')[0] #FIXME remove line, speed test only
 					files = ['package', 'folder.jpg']
 				else:
 					None
@@ -420,6 +439,8 @@ class HelloFS(Fuse):
 							files.append(application+'.desktop')
 				
 				elif path_list[2] == 'files':
+					
+					#FIXME use related apps way
 					installed_files = (str(item) for item in apt_cache[application].installedFiles)#should cache
 					for item in installed_files:
 						std_item = path_to_list(item)
@@ -431,39 +452,48 @@ class HelloFS(Fuse):
 					if not 'config' in translation['programs'][application]: translation['programs'][application]['config'] = {}
 				
 					assert len(path_list) <= 4 #just want flat config structure #FIXME files with the same name in different folders
-					installed_files = (str(item) for item in apt_cache[application].installedFiles)#should cache
-					files = []
-					for item in installed_files:
-						std_item = path_to_list(item)
-						if len(std_item) >= 1 and std_item[0] == 'etc':
-							if len(std_item) >= 2:#dont want /etc itself
-								if not os.path.isdir(list_to_path(std_item)):#or more... 
+					
+					for related_app in [application]+related_packages(application):
+						installed_files = (str(item) for item in apt_cache[related_app].installedFiles)#should cache
+						for item in installed_files:
+							std_item = path_to_list(item)
+							if len(std_item) >= 1 and std_item[0] == 'etc':
+								if len(std_item) >= 2:#dont want /etc itself
+									if not os.path.isdir(list_to_path(std_item)):#or more... 
 								
-									translation['programs'][application]['config'][std_item[-1]] = std_item #FIXME needs to deal with mutliple items having same name
-									#ie if this happen do name-(where_it_is_found)
 								
-									#for standardisation equivalent of: for item in translation['system']['executables']: files.append(translation['system']['executables'][item])
+										if not std_item[-1] in translation['programs'][application]['config']:
+											translation['programs'][application]['config'][std_item[-1]] = std_item 
+										else:
+											translation['programs'][application]['config'][std_item[-1]+'-('+std_item[-2]+')'] = std_item
+										#ie if this happen do name-(where_it_is_found)
 								
-									files.append(std_item[-1])
+										#for standardisation equivalent of: for item in translation['system']['executables']: files.append(translation['system']['executables'][item])
+								
 									
+									
+					for item in translation['programs'][application]['config']:
+						files.append(item)									
 									
 				elif path_list[2] == 'data':
 				
 					if not 'data' in translation['programs'][application]: translation['programs'][application]['data'] = {}	
 					
 					assert len(path_list) <= 4
-					installed_files = (str(item) for item in apt_cache[application].installedFiles)#should cache
-					files = []
-					for item in installed_files:
-						std_item = path_to_list(item)
-						if len(std_item) > 1 and len(std_item[-1]) > 5:#crash checker
-							if std_item[-1][-4:] in ['.png', '.jpg', '.mp3', '.wav', '.ico'] or std_item[-1][-5:] in ['.jpeg']:
+					
+					for related_app in [application]+related_packages(application):
+						installed_files = (str(item) for item in apt_cache[related_app].installedFiles)#should cache
+						files = []
+						for item in installed_files:
+							std_item = path_to_list(item)
+							if len(std_item) > 1 and len(std_item[-1]) > 5:#crash checker
+								if std_item[-1][-4:] in ['.png', '.jpg', '.mp3', '.wav', '.ico'] or std_item[-1][-5:] in ['.jpeg']:
 								
-								if not std_item[-1] in translation['programs'][application]['data']:#need recursive levels deep check FIXME
-									translation['programs'][application]['data'][std_item[-1]] = std_item
+									if not std_item[-1] in translation['programs'][application]['data']:#need recursive levels deep check FIXME
+										translation['programs'][application]['data'][std_item[-1]] = std_item
 									
-								else:
-									translation['programs'][application]['data'][std_item[-1]+'-('+std_item[-2]+')'] = std_item
+									else:
+										translation['programs'][application]['data'][std_item[-1]+'-('+std_item[-2]+')'] = std_item
 							
 								
 								
