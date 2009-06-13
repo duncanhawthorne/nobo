@@ -181,7 +181,14 @@ def application_to_icons(application): #FIXME speed me up with a library
 			return path_to_list(icon.get_filename())
 	#else
 	return None
-		
+	
+def desktop_to_executable(application):
+	output = open('/usr/share/applications/'+application+'.desktop', 'r').read()
+	for line in output.split('\n'):
+		if 'Exec' in line:
+			executable = line.split('=')[1].split(" ")[0]
+			break
+	return executable
 	
 		
 def get_target_file_path(path_list):
@@ -192,36 +199,14 @@ def get_target_file_path(path_list):
 	if len(path_list) >= 1 and path_list[0] == 'system':
 		if len(path_list) >= 2 and path_list[1] == 'executables':
 			if len(path_list) >= 3:
-				#print translation['system']
-					
-				#if not (path_list[2] in translation['system']['executables']: #ie need to regenerate
-				#	server.readdir(list_to_path(['system','executables'])
-					
-				try:	
-					return translation['system']['executables'][path_list[2]]
-				except: #if the key isnt there must have cleaned it up
-					#server.readdir(list_to_path(['system','executables'])) #FIXME but if request a file which doesnt exist, will cause regeneration #FIXME really do need some regeneration thing when later do cleanup
-					return translation['system']['executables'][path_list[2]]
-					
-		#		else:
-		#			
-		#			
-		#			print "we shouldnt have got here"
-		#			#######without tranlations#####	
-		#			locations = [['bin'], ['sbin'], ['usr','bin'], ['usr','local','bin'], ['usr','sbin'], ['usr','local','sbin'], ['usr','games']]#[path_to_list(item) for item in os.getenv('PATH').split(":")]
-		#			#ie like [['bin'], ['sbin'], ['usr','bin'], ['usr','local','bin'], ['usr','sbin'], ['usr','local','sbin'], ['usr','games']]#any more?
-		#			for loc in locations:
-		#				if len(path_list) >= 3 and path_list[2] in os.listdir(list_to_path(loc)):
-		#					return loc+[path_list[2]]
-		
+				return translation['system']['executables'][path_list[2]]
 	elif len(path_list) >= 1 and path_list[0] == 'programs':
-		
 		if len(path_list) >= 2: application = path_list[1]
 		
 		if len(path_list) >= 3 and path_list[2] == 'files':
 			if len(path_list) >= 4: #ie any strictly sub folders 
 				return path_list[3:]
-		
+	
 		elif len(path_list) >= 3 and path_list[2] == application:#ie the executable file
 			target = bash('which '+application)#find location of executable with same name as package
 			assert target != []
@@ -278,29 +263,51 @@ def get_target_file_path(path_list):
 	elif len(path_list) >= 1 and path_list[0] == 'libs':
 		None
 	elif len(path_list) >= 1 and path_list[0] == 'apps':
-		if len(path_list) >= 2:
-			if len(path_list) == 3 and path_list[2] == 'folder.jpg':
-				application = path_list[1]
-				icon_path_list = application_to_icons(application)
-				if icon_path_list == None:
-					return False
-				else:
-					return icon_path_list				
+		if len(path_list) == 1:
+			return None
+		else:# len(path_list) >= 2:
+			if len(path_list) == 2:
+				return None
 			else:
-				None
-				if len(path_list) >= 4 and path_list[2] == 'package':
-					#print path_list[1]
-					#print package_provider_dict
+				if len(path_list) == 3 and path_list[2] == 'folder.jpg': #FIXME have to do this, as dont want to call slow reverse file package lookup loads of times all in one go
+					application = path_list[1]
+					return application_to_icons(application)
+				if len(path_list) == 3 and ( path_list[2] == 'config' or path_list[2] == 'data' or path_list[2] == 'files' ):
+					return None #as in just make folders
+				if len(path_list) == 3 and path_list[2] == path_list[1]+'.desktop':
+					return ['usr','share','applications',path_list[1]+'.desktop']
+				
+				if len(path_list) == 3 and path_list[2] == desktop_to_executable(path_list[1]):
+					target = bash('which '+path_list[1])[0]#find location of executable with same name as package
+					return path_to_list(target)
+				
+				elif len(path_list) >= 4:
+				
+					if path_list[1] in package_provider_dict:
+						providing_package = package_provider_dict[path_list[1]]
+					else:	
+						try:
+							providing_package = bash('dpkg --search /usr/share/applications/'+path_list[1]+'.desktop')[0].split(':')[0]
+						except:
+							print path_list
+							providing_package = 'gedit'
+						package_provider_dict[path_list[1]] = providing_package
+
 					providing_package = package_provider_dict[path_list[1]]
-					linked_to =  get_target_file_path(['programs', providing_package]+path_list[3:])
-					#print linked_to
-					return linked_to
-				#	return path_to_list(mount_point) + ['programs', providing_package]+path_list[3:]
+					linked_to =  get_target_file_path(['programs', providing_package]+path_list[2:])
+					return linked_to			
+			
+					##if len(path_list) >= 4 and path_list[2] == 'package':
+					#	providing_package = package_provider_dict[path_list[1]]
+					#	linked_to =  get_target_file_path(['programs', providing_package]+path_list[2:])
+					#	return linked_to
+				else:
+					print path_list
+					print 'there is no other option'
 	elif False:#other link paths
 		None
 	else:
 		None
-		#print "get_target_File_path .. shouldnt have got here"
 	return False
 	
 		
@@ -308,13 +315,6 @@ def is_fake_file(path_list):
 	if get_fake_file_contents(path_list) != False: #if get_fake_contents comes up with any content, then it must be fake
 		#FIXME, when speed matters, dont actually bother going through the whole f get_fake_file_contents, ie run with args (path_list, "quick") and get it to stop
 		return True	
-#	#print path_list
-#	if len(path_list) >= 1 and path_list[0] == 'programs':
-#	#path[1] will be the program
-#		if len(path_list) >= 3 and path_list[2] == 'desktop file': 
-#			return True		
-#	#else
-#	return False
 
 def get_fake_file_contents(path_list):
 	if len(path_list) >= 1 and path_list[0] == 'programs':
@@ -324,11 +324,6 @@ def get_fake_file_contents(path_list):
 				if not application in gui_apps:
 					text += application+'\n'
 			return text
-#	if len(path_list) >= 1 and path_list[0] == 'programs':
-#	#path[1] will be the program
-#		if len(path_list) >= 3 and path_list[2] == 'desktop file': 
-#			return "hello"	
-	#else
 	return False
 
 def is_symlink(path_list):
@@ -367,27 +362,41 @@ def directory_contents(path_list):
 			#files = list(app.split('.')[0] for app in os.listdir('/usr/share/applications'))
 		else:
 			if len(path_list) == 2:
-				providing_package = bash('dpkg --search /usr/share/applications/'+path_list[1]+'.desktop')[0].split(':')[0] #FIXME remove line, speed test only
-				files = ['package', 'folder.jpg']
+				#providing_package = bash('dpkg --search /usr/share/applications/'+path_list[1]+'.desktop')[0].split(':')[0] #FIXME remove line, speed test only
+				#files = ['package', 'folder.jpg']
+				files = ['folder.jpg', 'files','config','data',path_list[1]+'.desktop', desktop_to_executable(path_list[1])]
+				None
 			else:
 				None
-				if len(path_list) >= 3 and path_list[2] == 'package':
-					if path_list[1] != '.hidden':
-						#print path_list
-						if path_list[1] in package_provider_dict:
-							providing_package = package_provider_dict[path_list[1]]
-						else:
-							try:
-								providing_package = bash('dpkg --search /usr/share/applications/'+path_list[1]+'.desktop')[0].split(':')[0]
-							except:
-								print path_list
-								providing_package = 'gedit'
-							package_provider_dict[path_list[1]] = providing_package
-					
-					#  FIXME cant have it listing another drectory insid the fuse stuff, as this would run readdir inside readdir, which (i think) causes a major hang
-					#	FIXME change to symbolic link	
-						files = directory_contents(['programs', providing_package]+path_list[3:])
-					#	print files
+				if path_list[1] != '.hidden':#FIXME remove
+					if path_list[1] in package_provider_dict:
+						providing_package = package_provider_dict[path_list[1]]
+					else:	
+						try:
+							providing_package = bash('dpkg --search /usr/share/applications/'+path_list[1]+'.desktop')[0].split(':')[0]
+						except:
+							print path_list
+							providing_package = 'gedit'
+						package_provider_dict[path_list[1]] = providing_package
+					files = directory_contents(['programs', providing_package]+path_list[2:])
+						
+			#	#if len(path_list) >= 3 and path_list[2] == 'package':
+			#		if path_list[1] != '.hidden':
+			#			#print path_list
+			#			if path_list[1] in package_provider_dict:
+			#				providing_package = package_provider_dict[path_list[1]]
+			#			else:
+			#				try:
+			#					providing_package = bash('dpkg --search /usr/share/applications/'+path_list[1]+'.desktop')[0].split(':')[0]
+			#				except:
+			#					print path_list
+			#					providing_package = 'gedit'
+			#				package_provider_dict[path_list[1]] = providing_package
+			#		
+			#		#  FIXME cant have it listing another drectory insid the fuse stuff, as this would run readdir inside readdir, which (i think) causes a major hang
+			#		#	FIXME change to symbolic link	
+			#			files = directory_contents(['programs', providing_package]+path_list[2:])
+			#		#	print files
 		
 		
 	elif path_list[0] == 'programs':
