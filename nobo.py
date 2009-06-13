@@ -247,6 +247,7 @@ def get_target_file_path(path_list):
 					return translation['programs'][application]['config'][path_list[3]]
 				
 				else: #slow #FIXME infact will soon not even produce the correct results #FIXME but if switch will need to call readdir if the keys arent there
+					print "slow else"
 					installed_files = (str(item) for item in apt_cache[application].installedFiles)#should cache
 					for item in installed_files:
 						std_item = path_to_list(item)
@@ -440,12 +441,12 @@ class HelloFS(Fuse):
 				
 				elif path_list[2] == 'files':
 					
-					#FIXME use related apps way
-					installed_files = (str(item) for item in apt_cache[application].installedFiles)#should cache
-					for item in installed_files:
-						std_item = path_to_list(item)
-						if (['programs', application, 'files']+std_item)[:-1] == path_list:
-							files.append(std_item[-1])
+					for related_app in [application]+related_packages(application):
+						installed_files = (str(item) for item in apt_cache[related_app].installedFiles)#should cache
+						for item in installed_files:
+							std_item = path_to_list(item)
+							if (['programs', application, 'files']+std_item)[:-1] == path_list:
+								files.append(std_item[-1])
 				
 				elif path_list[2] == 'config':
 				
