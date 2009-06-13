@@ -38,7 +38,7 @@ import gtk
 GTK = gtk.IconTheme()
 GTK.set_custom_theme('Mac4Lin_Icons')#FIXME set current theme
 
-package_provider = {}
+package_provider_dict = {}
 
 def bash(command):		
 	return os.popen(command).read().split("\n")[:-1]
@@ -288,8 +288,13 @@ def get_target_file_path(path_list):
 					return icon_path_list				
 			else:
 				None
-				#if len(path_list) >= 4 and path_list[2] == 'package':
-				#	providing_package = package_provider[path_list[1]]
+				if len(path_list) >= 4 and path_list[2] == 'package':
+					#print path_list[1]
+					#print package_provider_dict
+					providing_package = package_provider_dict[path_list[1]]
+					linked_to =  get_target_file_path(['programs', providing_package]+path_list[3:])
+					#print linked_to
+					return linked_to
 				#	return path_to_list(mount_point) + ['programs', providing_package]+path_list[3:]
 	elif False:#other link paths
 		None
@@ -348,6 +353,203 @@ def related_packages(package):
 				related.append(app)
 	return related
 
+
+def directory_contents(path_list):
+	files = []
+	if len(path_list) == 0:
+		files = ['programs', 'users', 'system', 'mount', 'libs', 'apps']
+	elif path_list[0] == 'apps':
+		if len(path_list) == 1:
+			for item in os.listdir('/usr/share/applications'):
+				if item[-8:] == '.desktop':
+					name = item.split('.desktop')[0]
+					files.append(name)
+			#files = list(app.split('.')[0] for app in os.listdir('/usr/share/applications'))
+		else:
+			if len(path_list) == 2:
+				providing_package = bash('dpkg --search /usr/share/applications/'+path_list[1]+'.desktop')[0].split(':')[0] #FIXME remove line, speed test only
+				files = ['package', 'folder.jpg']
+			else:
+				None
+				if len(path_list) >= 3 and path_list[2] == 'package':
+					if path_list[1] != '.hidden':
+						#print path_list
+						if path_list[1] in package_provider_dict:
+							providing_package = package_provider_dict[path_list[1]]
+						else:
+							try:
+								providing_package = bash('dpkg --search /usr/share/applications/'+path_list[1]+'.desktop')[0].split(':')[0]
+							except:
+								print path_list
+								providing_package = 'gedit'
+							package_provider_dict[path_list[1]] = providing_package
+					
+					#  FIXME cant have it listing another drectory insid the fuse stuff, as this would run readdir inside readdir, which (i think) causes a major hang
+					#	FIXME change to symbolic link	
+						files = directory_contents(['programs', providing_package]+path_list[3:])
+					#	print files
+		
+		
+	elif path_list[0] == 'programs':
+	
+		if not 'programs' in translation: translation['programs'] = {}
+	
+		if len(path_list) == 1:
+			for item in app_list:
+				if item[:3] != 'lib':
+					files.append(item)
+			
+			files.append('.hidden')
+			#files = app_list
+		else: #1 level down, inside program folder
+			#inside program folders
+			application = path_list[1]
+			
+			if not application in translation['programs']: translation['programs'][application] = {}
+			
+			if len(path_list) == 2:
+				#top level folder stuff
+				files = ['files', 'config', 'data', 'folder.jpg']#FIXME remove folder.jpg
+				tmp = bash('which '+(path_list)[1])
+				if not tmp == []:#ie this package has an associated executable
+					files.append(application)
+					
+					#as subet of programs will have launchers
+					if application in gui_apps: 
+						files.append(application+'.desktop')
+			
+			elif path_list[2] == 'files':
+				
+				for related_app in [application]+related_packages(application):
+					installed_files = (str(item) for item in apt_cache[related_app].installedFiles)#should cache
+					for item in installed_files:
+						std_item = path_to_list(item)
+						if (['programs', application, 'files']+std_item)[:-1] == path_list:
+							files.append(std_item[-1])
+			
+			elif path_list[2] == 'config':
+			
+				if not 'config' in translation['programs'][application]: translation['programs'][application]['config'] = {}
+			
+				assert len(path_list) <= 4 #just want flat config structure #FIXME files with the same name in different folders
+				
+				for related_app in [application]+related_packages(application):
+					installed_files = (str(item) for item in apt_cache[related_app].installedFiles)#should cache
+					for item in installed_files:
+						std_item = path_to_list(item)
+						if len(std_item) >= 1 and std_item[0] == 'etc':
+							if len(std_item) >= 2:#dont want /etc itself
+								if not os.path.isdir(list_to_path(std_item)):#or more... 
+							
+							
+									if not std_item[-1] in translation['programs'][application]['config']:
+										translation['programs'][application]['config'][std_item[-1]] = std_item 
+									else:
+										translation['programs'][application]['config'][std_item[-1]+'-('+std_item[-2]+')'] = std_item
+									#ie if this happen do name-(where_it_is_found)
+							
+									#for standardisation equivalent of: for item in translation['system']['executables']: files.append(translation['system']['executables'][item])
+							
+								
+								
+				for item in translation['programs'][application]['config']:
+					files.append(item)									
+								
+			elif path_list[2] == 'data':
+			
+				if not 'data' in translation['programs'][application]: translation['programs'][application]['data'] = {}	
+				
+				assert len(path_list) <= 4
+				
+				for related_app in [application]+related_packages(application):
+					installed_files = (str(item) for item in apt_cache[related_app].installedFiles)#should cache
+					files = []
+					for item in installed_files:
+						std_item = path_to_list(item)
+						if len(std_item) > 1 and len(std_item[-1]) > 5:#crash checker
+							if std_item[-1][-4:] in ['.png', '.jpg', '.mp3', '.wav', '.ico'] or std_item[-1][-5:] in ['.jpeg']:
+							
+								if not std_item[-1] in translation['programs'][application]['data']:#need recursive levels deep check FIXME
+									translation['programs'][application]['data'][std_item[-1]] = std_item
+								
+								else:
+									translation['programs'][application]['data'][std_item[-1]+'-('+std_item[-2]+')'] = std_item
+						
+							
+							
+							#old: files.append(std_item[-1])
+				for item in translation['programs'][application]['data']:
+					files.append(item)				
+			else:
+				print "readir else", path_list
+				raise "error"
+				#shouldnt get to an else statement
+				
+	elif path_list[0] == 'users':
+		files = os.listdir(list_to_path(['home']+(path_list)[1:]))
+					
+	elif path_list[0] == 'system':
+		
+		if not 'system' in translation: translation['system'] = {}
+	
+		if len(path_list) == 1:
+			files = ['environment', 'executables', 'headers', 'libraries', 'manuals', 'shared', 'tasks']
+		elif path_list[1] == 'environment':
+			None
+		elif path_list[1] == 'executables':
+		
+			#SPEED
+			if not 'executables' in translation['system']: translation['system']['executables'] = {}			
+		
+			locations = [['bin'], ['sbin'], ['usr','bin'], ['usr','local','bin'], ['usr','sbin'], ['usr','local','sbin'], ['usr','games']]#[path_to_list(item) for item in os.getenv('PATH').split(":")]
+			#ie like [['bin'], ['sbin'], ['usr','bin'], ['usr','local','bin'], ['usr','sbin'], ['usr','local','sbin'], ['usr','games']]#any more?
+			for loc in locations:
+				list_loc = os.listdir(list_to_path(loc))
+
+				#SPEED
+				for item in list_loc:
+					translation['system']['executables'][item] = loc+[item] #FIXME need to run cleanup, inevitable memory leak
+				
+				files += list_loc #FIXME or should write:
+				#for standardisation: for item in translation['system']['executables']: files.append(translation['system']['executables'][item])
+				
+		elif path_list[1] == 'headers':
+			None
+		elif path_list[1] == 'libraries':
+			locations = [['lib'], ['usr','lib'], ['var','lib']]#any more?
+			for loc in locations:
+				files += (os.listdir(list_to_path(loc)))
+		elif path_list[1] == 'manuals':
+			None								
+		elif path_list[1] == 'shared':
+			None							
+		elif path_list[1] == 'tasks':
+			None				
+	elif path_list[0] == 'mount':
+		files = files = os.listdir(list_to_path(['media']+(path_list)[1:]))
+	elif path_list[0] == 'libs':
+		if len(path_list) == 1:
+			for item in app_list:
+				if item[:3] == 'lib':
+					files.append(item)
+		else: #1 level down, inside program folder
+			#inside program folders
+			application = path_list[1]
+			if len(path_list) == 2:
+				files = ['same as programs here but for libs']						
+					
+			
+		#files = ['put something here']
+	
+	elif path_list[0] == '.Trash-1000':
+		None	
+	elif path_list[0] == '.Trash':
+		None						
+	else:
+		#print "readir else", path
+		files = ['this is a made up folder']
+	return files	
+
 class HelloFS(Fuse):
 
 
@@ -383,192 +585,7 @@ class HelloFS(Fuse):
 	def readdir(self, path, offset):
 		path_list = path_to_list(path)
 		
-		files = []
-		if len(path_list) == 0:
-			files = ['programs', 'users', 'system', 'mount', 'libs', 'apps']
-		elif path_list[0] == 'apps':
-			if len(path_list) == 1:
-				files = list(app.split('.')[0] for app in os.listdir('/usr/share/applications'))
-			else:
-				if len(path_list) == 2:
-					providing_package = bash('dpkg --search /usr/share/applications/'+path_list[1]+'.desktop')[0].split(':')[0] #FIXME remove line, speed test only
-					files = ['package', 'folder.jpg']
-				else:
-					None
-					if len(path_list) >= 3 and path_list[2] == 'package':
-						if path_list[1] != '.hidden':
-							#print path_list
-							if path_list[1] in package_provider:
-								providing_package = package_provider[path_list[1]]
-							else:
-								#providing_package = bash('dpkg --search /usr/share/applications/'+path_list[1]+'.desktop')[0].split(':')[0]
-								providing_package = 'gedit'
-								package_provider[path_list[1]] = providing_package
-						
-						#  FIXME cant have it listing another drectory insid the fuse stuff, as this would run readdir inside readdir, which (i think) causes a major hang
-						#	FIXME change to symbolic link	
-						#	files = os.listdir(list_to_path(path_to_list(mount_point) + ['programs', providing_package]+path_list[3:]))
-						#	print files
-			
-			
-		elif path_list[0] == 'programs':
-		
-			if not 'programs' in translation: translation['programs'] = {}
-		
-			if len(path_list) == 1:
-				for item in app_list:
-					if item[:3] != 'lib':
-						files.append(item)
-				
-				files.append('.hidden')
-				#files = app_list
-			else: #1 level down, inside program folder
-				#inside program folders
-				application = path_list[1]
-				
-				if not application in translation['programs']: translation['programs'][application] = {}
-				
-				if len(path_list) == 2:
-					#top level folder stuff
-					files = ['files', 'config', 'data', 'folder.jpg']#FIXME remove folder.jpg
-					tmp = bash('which '+(path_list)[1])
-					if not tmp == []:#ie this package has an associated executable
-						files.append(application)
-						
-						#as subet of programs will have launchers
-						if application in gui_apps: 
-							files.append(application+'.desktop')
-				
-				elif path_list[2] == 'files':
-					
-					for related_app in [application]+related_packages(application):
-						installed_files = (str(item) for item in apt_cache[related_app].installedFiles)#should cache
-						for item in installed_files:
-							std_item = path_to_list(item)
-							if (['programs', application, 'files']+std_item)[:-1] == path_list:
-								files.append(std_item[-1])
-				
-				elif path_list[2] == 'config':
-				
-					if not 'config' in translation['programs'][application]: translation['programs'][application]['config'] = {}
-				
-					assert len(path_list) <= 4 #just want flat config structure #FIXME files with the same name in different folders
-					
-					for related_app in [application]+related_packages(application):
-						installed_files = (str(item) for item in apt_cache[related_app].installedFiles)#should cache
-						for item in installed_files:
-							std_item = path_to_list(item)
-							if len(std_item) >= 1 and std_item[0] == 'etc':
-								if len(std_item) >= 2:#dont want /etc itself
-									if not os.path.isdir(list_to_path(std_item)):#or more... 
-								
-								
-										if not std_item[-1] in translation['programs'][application]['config']:
-											translation['programs'][application]['config'][std_item[-1]] = std_item 
-										else:
-											translation['programs'][application]['config'][std_item[-1]+'-('+std_item[-2]+')'] = std_item
-										#ie if this happen do name-(where_it_is_found)
-								
-										#for standardisation equivalent of: for item in translation['system']['executables']: files.append(translation['system']['executables'][item])
-								
-									
-									
-					for item in translation['programs'][application]['config']:
-						files.append(item)									
-									
-				elif path_list[2] == 'data':
-				
-					if not 'data' in translation['programs'][application]: translation['programs'][application]['data'] = {}	
-					
-					assert len(path_list) <= 4
-					
-					for related_app in [application]+related_packages(application):
-						installed_files = (str(item) for item in apt_cache[related_app].installedFiles)#should cache
-						files = []
-						for item in installed_files:
-							std_item = path_to_list(item)
-							if len(std_item) > 1 and len(std_item[-1]) > 5:#crash checker
-								if std_item[-1][-4:] in ['.png', '.jpg', '.mp3', '.wav', '.ico'] or std_item[-1][-5:] in ['.jpeg']:
-								
-									if not std_item[-1] in translation['programs'][application]['data']:#need recursive levels deep check FIXME
-										translation['programs'][application]['data'][std_item[-1]] = std_item
-									
-									else:
-										translation['programs'][application]['data'][std_item[-1]+'-('+std_item[-2]+')'] = std_item
-							
-								
-								
-								#old: files.append(std_item[-1])
-					for item in translation['programs'][application]['data']:
-						files.append(item)				
-				else:
-					print "readir else", path
-					raise "error"
-					#shouldnt get to an else statement
-					
-		elif path_list[0] == 'users':
-			files = os.listdir(list_to_path(['home']+(path_list)[1:]))
-						
-		elif path_list[0] == 'system':
-			
-			if not 'system' in translation: translation['system'] = {}
-		
-			if len(path_list) == 1:
-				files = ['environment', 'executables', 'headers', 'libraries', 'manuals', 'shared', 'tasks']
-			elif path_list[1] == 'environment':
-				None
-			elif path_list[1] == 'executables':
-			
-				#SPEED
-				if not 'executables' in translation['system']: translation['system']['executables'] = {}			
-			
-				locations = [['bin'], ['sbin'], ['usr','bin'], ['usr','local','bin'], ['usr','sbin'], ['usr','local','sbin'], ['usr','games']]#[path_to_list(item) for item in os.getenv('PATH').split(":")]
-				#ie like [['bin'], ['sbin'], ['usr','bin'], ['usr','local','bin'], ['usr','sbin'], ['usr','local','sbin'], ['usr','games']]#any more?
-				for loc in locations:
-					list_loc = os.listdir(list_to_path(loc))
-
-					#SPEED
-					for item in list_loc:
-						translation['system']['executables'][item] = loc+[item] #FIXME need to run cleanup, inevitable memory leak
-					
-					files += list_loc #FIXME or should write:
-					#for standardisation: for item in translation['system']['executables']: files.append(translation['system']['executables'][item])
-					
-			elif path_list[1] == 'headers':
-				None
-			elif path_list[1] == 'libraries':
-				locations = [['lib'], ['usr','lib'], ['var','lib']]#any more?
-				for loc in locations:
-					files += (os.listdir(list_to_path(loc)))
-			elif path_list[1] == 'manuals':
-				None								
-			elif path_list[1] == 'shared':
-				None							
-			elif path_list[1] == 'tasks':
-				None				
-		elif path_list[0] == 'mount':
-			files = files = os.listdir(list_to_path(['media']+(path_list)[1:]))
-		elif path_list[0] == 'libs':
-			if len(path_list) == 1:
-				for item in app_list:
-					if item[:3] == 'lib':
-						files.append(item)
-			else: #1 level down, inside program folder
-				#inside program folders
-				application = path_list[1]
-				if len(path_list) == 2:
-					files = ['same as programs here but for libs']						
-						
-				
-			#files = ['put something here']
-		
-		elif path_list[0] == '.Trash-1000':
-			None	
-		elif path_list[0] == '.Trash':
-			None						
-		else:
-			#print "readir else", path
-			files = ['this is a made up folder']
+		files = directory_contents(path_list)
 		
 		#the yield that everything uses
 		for r in  ['.', '..'] + files:
