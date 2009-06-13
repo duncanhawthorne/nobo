@@ -355,10 +355,14 @@ def directory_contents(path_list):
 		files = ['programs', 'users', 'system', 'mount', 'libs', 'apps']
 	elif path_list[0] == 'apps':
 		if len(path_list) == 1:
-			for item in os.listdir('/usr/share/applications'):
+			listed_dir = os.listdir('/usr/share/applications')
+			for item in listed_dir:
 				if item[-8:] == '.desktop':
 					name = item.split('.desktop')[0]
-					files.append(name)
+					if '-' in name and name.split('-')[0]+'.desktop' in listed_dir: #try to cut out junk like apps like brasero-nautilus, just want brasero
+						continue #ie
+					else:
+						files.append(name)
 			#files = list(app.split('.')[0] for app in os.listdir('/usr/share/applications'))
 		else:
 			if len(path_list) == 2:
