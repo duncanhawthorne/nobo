@@ -135,6 +135,21 @@ class MyStat(fuse.Stat):
 translation = {}
 #a dict list linked_file:location_of_thing_linked_to
 
+def providing_package_func(start_file): #FIXME quicker, less fallback to gedit
+	if start_file in package_provider_dict:
+		providing_package = package_provider_dict[start_file]
+	else:	
+		try:
+			providing_package = bash('dpkg --search /usr/share/applications/'+start_file+'.desktop')[0].split(':')[0]
+		except:
+			print path_list
+			providing_package = 'gedit'
+		package_provider_dict[start_file] = providing_package
+
+	providing_package = package_provider_dict[start_file]
+	return providing_package
+
+
 def is_linked_path(path_list):
 	output = get_target_file_path(path_list)
 	if output != False and output != None: #if get_taget comes up with any target, then it must be linked
@@ -283,17 +298,7 @@ def get_target_file_path(path_list):
 				
 				elif len(path_list) >= 4:
 				
-					if path_list[1] in package_provider_dict:
-						providing_package = package_provider_dict[path_list[1]]
-					else:	
-						try:
-							providing_package = bash('dpkg --search /usr/share/applications/'+path_list[1]+'.desktop')[0].split(':')[0]
-						except:
-							print path_list
-							providing_package = 'gedit'
-						package_provider_dict[path_list[1]] = providing_package
-
-					providing_package = package_provider_dict[path_list[1]]
+					providing_package = providing_package_func(path_list[1])
 					linked_to =  get_target_file_path(['programs', providing_package]+path_list[2:])
 					return linked_to			
 			
@@ -373,15 +378,7 @@ def directory_contents(path_list):
 			else:
 				None
 				if path_list[1] != '.hidden':#FIXME remove
-					if path_list[1] in package_provider_dict:
-						providing_package = package_provider_dict[path_list[1]]
-					else:	
-						try:
-							providing_package = bash('dpkg --search /usr/share/applications/'+path_list[1]+'.desktop')[0].split(':')[0]
-						except:
-							print path_list
-							providing_package = 'gedit'
-						package_provider_dict[path_list[1]] = providing_package
+					providing_package = providing_package_func(path_list[1])
 					files = directory_contents(['programs', providing_package]+path_list[2:])
 						
 			#	#if len(path_list) >= 3 and path_list[2] == 'package':
@@ -705,7 +702,20 @@ class HelloFS(Fuse):
 			#files created from nothing 
 		else:
 			raise "error"		
-
+	
+	def rmdir(self, path):
+		path_list = path_to_list(path)
+		if len(path_list) >= 1 and path_list[0] == 'programs':
+			if len(path_list) == 2:
+				print "uninstalling "+path_list[1]#FIXME actually do
+		if len(path_list) >= 1 and path_list[0] == 'apps':
+			if len(path_list) == 2:
+				print "uninstalling "+providing_package_func(path_list[1])			
+			else:
+				return -errno.EOPNOTSUPP
+		else:
+			return -errno.EOPNOTSUPP
+	
 	def ftruncate(self, path, size, fh=None):
 		return -errno.EOPNOTSUPP#
 		
