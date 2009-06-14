@@ -371,8 +371,6 @@ def directory_contents(path_list):
 			#files = list(app.split('.')[0] for app in os.listdir('/usr/share/applications'))
 		else:
 			if len(path_list) == 2:
-				#providing_package = bash('dpkg --search /usr/share/applications/'+path_list[1]+'.desktop')[0].split(':')[0] #FIXME remove line, speed test only
-				#files = ['package', 'folder.jpg']
 				files = ['folder.jpg', 'files','config','data',path_list[1]+'.desktop', desktop_to_executable(path_list[1])]
 				None
 			else:
@@ -380,25 +378,6 @@ def directory_contents(path_list):
 				if path_list[1] != '.hidden':#FIXME remove
 					providing_package = providing_package_func(path_list[1])
 					files = directory_contents(['programs', providing_package]+path_list[2:])
-						
-			#	#if len(path_list) >= 3 and path_list[2] == 'package':
-			#		if path_list[1] != '.hidden':
-			#			#print path_list
-			#			if path_list[1] in package_provider_dict:
-			#				providing_package = package_provider_dict[path_list[1]]
-			#			else:
-			#				try:
-			#					providing_package = bash('dpkg --search /usr/share/applications/'+path_list[1]+'.desktop')[0].split(':')[0]
-			#				except:
-			#					print path_list
-			#					providing_package = 'gedit'
-			#				package_provider_dict[path_list[1]] = providing_package
-			#		
-			#		#  FIXME cant have it listing another drectory insid the fuse stuff, as this would run readdir inside readdir, which (i think) causes a major hang
-			#		#	FIXME change to symbolic link	
-			#			files = directory_contents(['programs', providing_package]+path_list[2:])
-			#		#	print files
-		
 		
 	elif path_list[0] == 'programs':
 	
@@ -406,10 +385,10 @@ def directory_contents(path_list):
 	
 		if len(path_list) == 1:
 			for item in app_list:
-				if item[:3] != 'lib':
+				if item[:3] != 'lib':#FIXME probably remove
 					files.append(item)
 			
-			files.append('.hidden')
+			files.append('.hidden') #FIXME perhaps remove this idea as now done better in 'apps'
 			#files = app_list
 		else: #1 level down, inside program folder
 			#inside program folders
@@ -451,16 +430,10 @@ def directory_contents(path_list):
 							if len(std_item) >= 2:#dont want /etc itself
 								if not os.path.isdir(list_to_path(std_item)):#or more... 
 							
-							
 									if not std_item[-1] in translation['programs'][application]['config']:
 										translation['programs'][application]['config'][std_item[-1]] = std_item 
 									else:
 										translation['programs'][application]['config'][std_item[-1]+'-('+std_item[-2]+')'] = std_item
-									#ie if this happen do name-(where_it_is_found)
-							
-									#for standardisation equivalent of: for item in translation['system']['executables']: files.append(translation['system']['executables'][item])
-							
-								
 								
 				for item in translation['programs'][application]['config']:
 					files.append(item)									
@@ -485,9 +458,6 @@ def directory_contents(path_list):
 								else:
 									translation['programs'][application]['data'][std_item[-1]+'-('+std_item[-2]+')'] = std_item
 						
-							
-							
-							#old: files.append(std_item[-1])
 				for item in translation['programs'][application]['data']:
 					files.append(item)				
 			else:
@@ -519,9 +489,8 @@ def directory_contents(path_list):
 				#SPEED
 				for item in list_loc:
 					translation['system']['executables'][item] = loc+[item] #FIXME need to run cleanup, inevitable memory leak
-				
-				files += list_loc #FIXME or should write:
-				#for standardisation: for item in translation['system']['executables']: files.append(translation['system']['executables'][item])
+			
+			for item in translation['system']['executables']: files.append(item)
 				
 		elif path_list[1] == 'headers':
 			None
@@ -548,8 +517,6 @@ def directory_contents(path_list):
 			if len(path_list) == 2:
 				files = ['same as programs here but for libs']						
 					
-			
-		#files = ['put something here']
 	
 	elif path_list[0] == '.Trash-1000':
 		None	
